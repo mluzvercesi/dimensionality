@@ -74,7 +74,7 @@ cat(sprintf("Tardó %.2f minutos\n", end_time-start_time))
 load("~/Documents/results/Chg.RData")
 neuro_offs <- get("GO:0022008",GOBPOFFSPRING) # neurogenesis
 
-hgs <- hgsA_scaled
+hgs <- hgsA
 cat <- unique(hgs[,"GOBPID"]) #categorias GO
 gopcs <- matrix(0L, nrow = length(cat), ncol = 11)
 rownames(gopcs) <- cat
@@ -91,7 +91,23 @@ for (i in 1:10){
 }
 
 ind_neuro <- rownames(gopcs) %in% neuro_offs
-gopcs[ind_neuro,"Neuro"] <- 1
+gopcs[ind_neuro,"Neuro"] <- .001
+
+if(FALSE){
+  a<-gopcs
+  a[a==0]<-1 #hacer una matriz binaria
+  a<-ifelse(a<.05,0,1)
+  i11<-which(apply(a,1,sum)<ncol(a)) # GOs que aparecen
+  
+  heatmap.2(a[i11,])
+  
+  for(ipca in 1:11){
+    igo<-which(a[,ipca]==0)
+    print(Term(names(igo)))
+    readline("Press ENTER")     
+  }
+  
+}
 
 heatmap(gopcs) # todo
 heatmap(gopcs, Rowv=NA, Colv=NA) #sin reordenar con dendrograma
