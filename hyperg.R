@@ -1,7 +1,7 @@
 source("~/Documents/funciones.R")
 #------------------------------------------------------------------------
-load("~/Documents/results/Cpca.RData")
-load("~/Documents/results/Csubconjunto.RData")
+load("~/Documents/dimensionality/results/Cpca.RData")
+load("~/Documents/dimensionality/results/Csubconjunto.RData")
 #------------------------------------------------------------------------
 # require("package") or "package" %in% rownames(installed.packages())
 library(GO.db)
@@ -71,8 +71,9 @@ colnames(hgs)[8] <- "PC"
 end_time <- Sys.time()
 cat(sprintf("Tardó %.2f minutos\n", end_time-start_time))
 #------------------------------------------------------------------------
-load("~/Documents/results/Chg.RData")
+load("~/Documents/dimensionality/results/Chg.RData")
 neuro_offs <- get("GO:0022008",GOBPOFFSPRING) # neurogenesis
+nervdep_offs <- get("GO:0007399",GOBPOFFSPRING) # nervous system development (incluye neurogen)
 
 hgs <- hgsA
 cat <- unique(hgs[,"GOBPID"]) #categorias GO
@@ -89,9 +90,12 @@ for (i in 1:10){
   # reemplazo de pvalues
   gopcs[ind_cat,i] <- hgs[hgs[,"PC"]==i,"Pvalue"][ind_pval]
 }
+rm(cols,cat,ind_cat,ind_pval)
 
 ind_neuro <- rownames(gopcs) %in% neuro_offs
+ind_nerv <- rownames(gopcs) %in% nervdep_offs
 gopcs[ind_neuro,"Neuro"] <- .001
+gopcs[ind_nerv,"Neuro"] <- .001
 
 if(FALSE){
   a<-gopcs
@@ -124,3 +128,9 @@ names(genes_enbps) <- hyperg_df[,"GOBPID"]
 
 # representacion visual de GO (los resultados, no todo GO)
 # comparar distribucion de genes importantes en BP vs dist de todos los genes que no estan en BP
+
+#------------------------------------------------------------------------
+library(GOSemSim)
+mmGO <- godata("org.Mm.eg.db", ont="BP")
+sim_resn <- mgoSim(rownames(gopcs),rownames(gopcs),semData = mmGO, measure ="Resnik",combine=NULL)
+sim_wang <- mgoSim(rownames(gopcs),rownames(gopcs),semData = mmGO, measure = "Wang", combine=NULL)
