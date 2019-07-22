@@ -1,7 +1,7 @@
 source("~/Documents/funciones.R")
 #------------------------------------------------------------------------
-load("~/Documents/dimensionality/results/Cpca.RData")
-load("~/Documents/dimensionality/results/Csubconjunto.RData")
+load("~/Documents/dimensionality/results/Apca.RData")
+load("~/Documents/dimensionality/results/Asubconjunto.RData")
 #------------------------------------------------------------------------
 # require("package") or "package" %in% rownames(installed.packages())
 library(GO.db)
@@ -71,7 +71,7 @@ colnames(hgs)[8] <- "PC"
 end_time <- Sys.time()
 cat(sprintf("Tardó %.2f minutos\n", end_time-start_time))
 #------------------------------------------------------------------------
-load("~/Documents/dimensionality/results/Chg.RData")
+load("~/Documents/dimensionality/results/Ahg.RData")
 neuro_offs <- get("GO:0022008",GOBPOFFSPRING) # neurogenesis
 nervdep_offs <- get("GO:0007399",GOBPOFFSPRING) # nervous system development (incluye neurogen)
 
@@ -90,7 +90,7 @@ for (i in 1:10){
   # reemplazo de pvalues
   gopcs[ind_cat,i] <- hgs[hgs[,"PC"]==i,"Pvalue"][ind_pval]
 }
-rm(cols,cat,ind_cat,ind_pval)
+rm(i,cols,cat,ind_cat,ind_pval)
 
 ind_neuro <- rownames(gopcs) %in% neuro_offs
 ind_nerv <- rownames(gopcs) %in% nervdep_offs
@@ -98,19 +98,18 @@ gopcs[ind_neuro,"Neuro"] <- .001
 gopcs[ind_nerv,"Neuro"] <- .001
 
 if(FALSE){
-  a<-gopcs
-  a[a==0]<-1 #hacer una matriz binaria
-  a<-ifelse(a<.05,0,1)
-  i11<-which(apply(a,1,sum)<ncol(a)) # GOs que aparecen
+  gopcs_bin <- gopcs
+  gopcs_bin[gopcs_bin==0]<-1 #hacer una matriz binaria
+  gopcs_bin <- ifelse(gopcs_bin<.05,0,1)
+  i11 <- which(apply(gopcs_bin,1,sum)<ncol(gopcs_bin)) # GOs que aparecen
   
-  heatmap.2(a[i11,])
+  heatmap.2(gopcs_bin[i11,],trace="none")
   
   for(ipca in 1:11){
-    igo<-which(a[,ipca]==0)
+    igo<-which(gopcs_bin[,ipca]==0)
     print(Term(names(igo)))
     readline("Press ENTER")     
   }
-  
 }
 
 heatmap(gopcs) # todo
@@ -131,6 +130,27 @@ names(genes_enbps) <- hyperg_df[,"GOBPID"]
 
 #------------------------------------------------------------------------
 library(GOSemSim)
+library("igraph")
+
 mmGO <- godata("org.Mm.eg.db", ont="BP")
-sim_resn <- mgoSim(rownames(gopcs),rownames(gopcs),semData = mmGO, measure ="Resnik",combine=NULL)
-sim_wang <- mgoSim(rownames(gopcs),rownames(gopcs),semData = mmGO, measure = "Wang", combine=NULL)
+# ALGUNOS GO NO APARECEN EN LA BASE DE DATOS. Tal vez se puede corregir en vez de ignorar
+indices <- rownames(gopcs_bin) %in% names(mmGO@IC)
+sim <- mgoSim(rownames(gopcs_bin)[indices],rownames(gopcs_bin)[indices],semData = mmGO, measure ="Resnik",combine=NULL)
+G <- graph_from_adjacency_matrix(adjmatrix = sim, weighted = TRUE, diag = FALSE, mode = "undirected")
+
+colores <- c("green","orange")
+
+indices_nerv <- V(G)$name %in% nervdep_offs
+indices_neur <- V(G)$name %in% neuro_offs
+indices_pc <- V(G)$name %in% rownames(gopcs_bin)[gopcs_bin[,"1"]==0]
+
+V(G)$type[indices_nerv] <- 1
+V(G)$type[indices_pc] <- 2
+
+nombres <- which(V(G)$name %in% c(nervdep_offs,rownames(gopcs_bin)[gopcs_bin[,"1"]==0]))
+
+plot.igraph(G,vertex.color=adjustcolor(colores[V(G)$type], alpha.f=.5),vertex.label=NA)
+
+# graficar un subgrafo
+subG <- subgraph(G,nombres)
+plot.igraph(subG,vertex.color=adjustcolor(colores[V(G)$type], alpha.f=.5),vertex.label=NA)
