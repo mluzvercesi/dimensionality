@@ -1,5 +1,6 @@
-#load("~/Documents/results/myworkspace.RData")
-#save(object1,object2,file="~/Documents/results/myworkspace.RData")
+# load("~/Documents/results/myworkspace.RData")
+# save(object1,object2,file="~/Documents/results/myworkspace.RData")
+# require("package") or "package" %in% rownames(installed.packages())
 
 norm_vect <- function(x) {sqrt(sum(x^2))}
 #------------------------------------------------------------------------
