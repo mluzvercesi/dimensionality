@@ -78,14 +78,15 @@ cat(sprintf("Tardó %.2f minutos\n", end_time-start_time))
 #REPRESENTACION VISUAL---------------------------------------------------
 load("~/Documents/dimensionality/results/Ahg.RData")
 
-neuro_offs <- get("GO:0022008",GOBPOFFSPRING) # neurogenesis
 nervdev_offs <- get("GO:0007399",GOBPOFFSPRING) # nervous system development (incluye neurogen)
+neuro_offs <- get("GO:0022008",GOBPOFFSPRING) # neurogenesis
 
 hgs <- hgsA
 cat <- unique(hgs[,"GOBPID"]) #categorias GO
 cols <- unique(hgs[,"PC"])
 Npcs <- length(cols)
 gopcs <- matrix(0L, nrow = length(cat), ncol = Npcs+1)
+#creo que lo correcto seria una matriz de max(hgs[,"Pvalue"]), por si hay un pvalue que sea exactamente 0? (puede?)
 rownames(gopcs) <- cat
 colnames(gopcs) <- c(cols,"Neuro")
 rm(cat)
@@ -101,13 +102,13 @@ for (i in cols){
 rm(i,cols,ind_cat,ind_pval,Npcs)
 
 
-ind_neuro <- rownames(gopcs) %in% neuro_offs
 ind_nerv <- rownames(gopcs) %in% nervdev_offs
-gopcs[ind_neuro,"Neuro"] <- .001
+ind_neuro <- rownames(gopcs) %in% neuro_offs
 gopcs[ind_nerv,"Neuro"] <- .001
-rm(ind_neuro, ind_nerv)
+gopcs[ind_neuro,"Neuro"] <- .001
+rm(ind_nerv, ind_neuro)
 
-heatmap.2(gopcs) # todo
+heatmap.2(gopcs,trace="none") # todo
 heatmap.2(sqrt(gopcs), trace="none") #reescalada
 heatmap(sqrt(gopcs[gopcs[,"Neuro"]==.001,])) # solo las neuro, reescaladas
 
@@ -116,11 +117,11 @@ if(FALSE){
   gopcs01 <- gopcs
   gopcs01[gopcs01==0]<-1 #hacer una matriz binaria
   gopcs01 <- ifelse(gopcs01<.05,0,1)
-  i11 <- which(apply(gopcs01,1,sum)<ncol(gopcs01)) # GOs que aparecen
+  i_gos <- which(apply(gopcs01,1,sum)<ncol(gopcs01)) # GOs que aparecen
   
-  heatmap.2(gopcs01[i11,],trace="none")
+  heatmap.2(gopcs01[i_gos,],trace="none")
   
-  for(ipca in 1:11){
+  for(ipca in 1:ncol(gopcs01)){
     igo<-which(gopcs01[,ipca]==0)
     print(Term(names(igo)))
     readline("Press ENTER")     
@@ -145,14 +146,15 @@ mmGO <- godata("org.Mm.eg.db", ont="BP")
 indices <- rownames(gopcs01) %in% names(mmGO@IC)
 faltan <- rownames(gopcs01)[!indices]
 
+# VER FUNCION IC
+faltan %in% goAnno$GO
+# Por que hay elementos GO que existen en Mm pero no en el global? como crea el env global?
 
+goSim("GO:0007399", "GO:0007399", semData=mmGO, measure="Resnik") #como ejemplo, nerv sys dev
 get(faltan[3], org.Mm.egGO2ALLEGS)
 mapIds(org.Mm.eg.db, keys=faltan, column=c("ENTREZID"), keytype="GO")
-universo_BP <- get("GO:0008150", org.Mm.egGO2ALLEGS)
-universo_BP_GO <- eg2go(universo_BP)
-a <- get("GO:0048731", org.Mm.egGO2ALLEGS)
-a_GO <- eg2go(a)
--log2(length(unique(a_GO))/length(unique(universo_BP_GO))) # NO FUNCIONA
+
+#The calculation is based on counting how many times a specific GO term or any of its direct or indirect offspring appear in annotated gene products
 
 #ademas, sacar cosas que sobran de la lista. Usar unicamente evidencia experimental:
 # Inferred from Experiment (EXP)
@@ -166,6 +168,7 @@ a_GO <- eg2go(a)
 # Inferred from High Throughput Mutant Phenotype (HMP)
 # Inferred from High Throughput Genetic Interaction (HGI)
 # Inferred from High Throughput Expression Pattern (HEP)
+
 
 go_list <- rownames(gopcs01)[indices]
 sim <- mgoSim(go_list,go_list,semData = mmGO, measure ="Resnik",combine=NULL)
