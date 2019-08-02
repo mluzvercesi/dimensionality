@@ -3,6 +3,59 @@
 # require("package") or "package" %in% rownames(installed.packages())
 
 norm_vect <- function(x) {sqrt(sum(x^2))}
+
+#------------------------------------------------------------------------
+##' @importFrom AnnotationDbi as.list
+##' @importFrom GO.db GOBPOFFSPRING
+# fuente: GOSemSim https://rdrr.io/bioc/GOSemSim/src/R/computeIC.R
+
+computarIC <- function(OrgDb, keytype = "ENTREZID", ont) {
+  ont <- toupper(ont)
+  ont <- match.arg(ont, c("BP", "CC", "MF"))
+  
+  OrgDb <- load_OrgDb(OrgDb)
+  kk <- keys(OrgDb, keytype=keytype)
+  goAnno <- suppressMessages(
+    select(OrgDb, keys=kk, keytype=keytype,
+           columns=c("GO", "ONTOLOGY")))
+  
+  goAnno <- goAnno[!is.na(goAnno$GO), ]
+  goAnno <- goAnno[goAnno$ONTOLOGY == ont,]
+  
+  goids <- select(GO.db, keys="BP", columns=c("GOID"), keytype="ONTOLOGY")
+  goids <- goids$GOID
+  ## all GO terms appearing in an given ontology ###########
+  goterms=goAnno$GO
+  gocount <- table(goterms)
+  ## goid of specific organism and selected category.
+  goname  <- names(gocount) 
+  
+  ## ensure goterms not appearing in the specific annotation have 0 frequency
+  go.diff        <- setdiff(goids, goname) #esta en goids pero no en goname
+  m              <- double(length(go.diff))
+  names(m)       <- go.diff
+  gocount        <- as.vector(gocount)
+  names(gocount) <- goname
+  gocount        <- c(gocount, m)
+  
+  Offsprings <- switch(ont,
+                       MF = AnnotationDbi::as.list(GOMFOFFSPRING),
+                       BP = AnnotationDbi::as.list(GOBPOFFSPRING),
+                       CC = AnnotationDbi::as.list(GOCCOFFSPRING))
+  
+  cnt <- gocount[goids] + sapply(goids, function(i) sum(gocount[Offsprings[[i]]], na.rm=TRUE))
+  names(cnt) <- goids
+  # CORRECCION DE ESTAS DOS ULTIMAS LINEAS:
+  #cnt <- gocount + sapply(names(gocount), function(i) sum(gocount[Offsprings[[i]]], na.rm=TRUE))
+  #names(cnt) <- names(gocount)
+  
+  ## the probabilities of occurrence of GO terms in a specific corpus.
+  p <- cnt/sum(gocount)
+  ## IC of GO terms was quantified as the negative log likelihood.
+  IC <- -log(p)
+  return(IC)
+}
+
 #------------------------------------------------------------------------
 mean_logbin <- function(y,x){
   # Valores medios de y con bineado logaritmico, con limites de x

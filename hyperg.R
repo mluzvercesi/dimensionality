@@ -6,7 +6,6 @@ load("~/Documents/dimensionality/results/Asubconjunto.RData")
 library(GO.db)
 library(GOstats)
 library(org.Mm.eg.db)
-
 require(gplots) # para tener heatmap con referencias
 #------------------------------------------------------------------------
 # para ver que tiene el paquete de Mm
@@ -25,7 +24,7 @@ as.numeric(names(table(grep("Rik",names(a)))))
 #TEST HIPERGEOMETRICO PARA SOBRERREPRESENTACION--------------------------
 # hgs es una matriz con resultados del test: pvalue para cada PC
 
-pca <- pcaCsub
+pca <- pcaAsub
 
 gene_universe <- rownames(pca$rotation)
 gene_universe_id <- sym2eg(gene_universe)
@@ -46,7 +45,8 @@ for (i in 1:10){
     cat(sprintf("Fraccion de genes sin mapear: %.2f", sum(is.na(selected_genes_id))/length(selected_genes_id)))
   }
   
-  params <- new("GOHyperGParams", geneIds=selected_genes_id, universeGeneIds=gene_universe_id, annotation="org.Mm.eg.db",ontology="BP", pvalueCutoff=hgCutoff, conditional=FALSE, testDirection="over")
+  params <- new("GOHyperGParams", geneIds=selected_genes_id, universeGeneIds=gene_universe_id, annotation="org.Mm.eg.db",
+                ontology="BP", pvalueCutoff=hgCutoff, conditional=FALSE, testDirection="over")
   hyperg_results <- hyperGTest(params)
   hyperg_df <- summary(hyperg_results)
   # devuelve GOBPID (ids GO de c/categoria), pvalue, oddsratio, expcount, 
@@ -79,7 +79,7 @@ cat(sprintf("Tardó %.2f minutos\n", end_time-start_time))
 load("~/Documents/dimensionality/results/Ahg.RData")
 
 nervdev_offs <- get("GO:0007399",GOBPOFFSPRING) # nervous system development (incluye neurogen)
-neuro_offs <- get("GO:0022008",GOBPOFFSPRING) # neurogenesis
+#neuro_offs <- get("GO:0022008",GOBPOFFSPRING) # neurogenesis
 
 hgs <- hgsA
 cat <- unique(hgs[,"GOBPID"]) #categorias GO
@@ -101,12 +101,12 @@ for (i in cols){
 }
 rm(i,cols,ind_cat,ind_pval,Npcs)
 
-
 ind_nerv <- rownames(gopcs) %in% nervdev_offs
-ind_neuro <- rownames(gopcs) %in% neuro_offs
 gopcs[ind_nerv,"Neuro"] <- .001
-gopcs[ind_neuro,"Neuro"] <- .001
-rm(ind_nerv, ind_neuro)
+#ind_neuro <- rownames(gopcs) %in% neuro_offs
+#gopcs[ind_neuro,"Neuro"] <- .001
+#rm(ind_nerv, ind_neuro)
+rm(ind_nerv)
 
 heatmap.2(gopcs,trace="none") # todo
 heatmap.2(sqrt(gopcs), trace="none") #reescalada
@@ -139,38 +139,24 @@ names(genes_enbps) <- hyperg_df[,"GOBPID"]
 library(GOSemSim)
 library("igraph")
 
-mmGO <- godata("org.Mm.eg.db", ont="BP")
+# OJO CON LA FUNCION godata
+mmGO <- godata("org.Mm.eg.db", ont="BP", computeIC=FALSE)
+mmGO@IC <- computarIC("org.Mm.eg.db", keytype = "ENTREZID", ont = "BP")
 
-# ALGUNOS GO NO APARECEN EN LA BASE DE DATOS. Hay que agregar manualmente:
-# mmGO@keys, mmGO@IC, mmGO@geneAnno (ENTREZID GO EVIDENCE ONTOLOGY)
-indices <- rownames(gopcs01) %in% names(mmGO@IC)
-faltan <- rownames(gopcs01)[!indices]
+# Por que hay elementos que no existen en Mm, si hgs fue creado usando Mm? Tampoco existen en el global ??
 
-# VER FUNCION IC
-faltan %in% goAnno$GO
-# Por que hay elementos GO que existen en Mm pero no en el global? como crea el env global?
+#ademas, sacar cosas que sobran de la lista. Usar unicamente evidencia experimental
+# fuente: http://geneontology.org/docs/guide-go-evidence-codes/
+evidencia <- c("EXP", "IDA", "IPI", "IMP", "IGI", "IEP", "HTP", "HDA", "HMP", "HGI", "HEP")
+ind_ev <- mmGO@geneAnno$EVIDENCE %in% evidencia
+go_exp <- mmGO@geneAnno[ind_ev,"GO"]
 
-goSim("GO:0007399", "GO:0007399", semData=mmGO, measure="Resnik") #como ejemplo, nerv sys dev
-get(faltan[3], org.Mm.egGO2ALLEGS)
-mapIds(org.Mm.eg.db, keys=faltan, column=c("ENTREZID"), keytype="GO")
+go_list <- intersect(rownames(gopcs01), go_exp)
 
-#The calculation is based on counting how many times a specific GO term or any of its direct or indirect offspring appear in annotated gene products
+#solo faltaria ver como calcula Resnik. normaliza? Ver que dan distinto:
+goSim("GO:0007399", "GO:0007399", semData=mmGO, measure="Resnik") #ejemplo: nerv sys dev
+mmGO@IC["GO:0007399"]
 
-#ademas, sacar cosas que sobran de la lista. Usar unicamente evidencia experimental:
-# Inferred from Experiment (EXP)
-# Inferred from Direct Assay (IDA)
-# Inferred from Physical Interaction (IPI)
-# Inferred from Mutant Phenotype (IMP)
-# Inferred from Genetic Interaction (IGI)
-# Inferred from Expression Pattern (IEP)
-# Inferred from High Throughput Experiment (HTP)
-# Inferred from High Throughput Direct Assay (HDA)
-# Inferred from High Throughput Mutant Phenotype (HMP)
-# Inferred from High Throughput Genetic Interaction (HGI)
-# Inferred from High Throughput Expression Pattern (HEP)
-
-
-go_list <- rownames(gopcs01)[indices]
 sim <- mgoSim(go_list,go_list,semData = mmGO, measure ="Resnik",combine=NULL)
 sim2 <- mgoSim(go_list,go_list,semData = mmGO, measure ="Wang",combine=NULL)
 
