@@ -3,7 +3,22 @@
 # require("package") or "package" %in% rownames(installed.packages())
 
 norm_vect <- function(x) {sqrt(sum(x^2))}
-
+#------------------------------------------------------------------------
+cos_sim <- function(x){
+  N <- dim(x)[2]
+  cosine <- matrix(rep(0.0, N*N), nrow=N, ncol=N)
+  for (i in 1:N){
+    X = x[,i]
+    X2 = sqrt(sum(X^2))
+    for (j in i:N){
+      Y = x[,j]
+      Y2 = sqrt(sum(Y^2))
+      cosine[i,j] = sum(X*Y)/(X2*Y2)
+      cosine[j,i] = cosine[i,j]
+    }
+  }
+  return(cosine)
+}
 #------------------------------------------------------------------------
 ##' @importFrom AnnotationDbi as.list
 ##' @importFrom GO.db GOBPOFFSPRING

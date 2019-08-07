@@ -21,7 +21,7 @@ table(a[,2])
 a<-as.list(org.Mm.egALIAS2EG)
 as.numeric(names(table(grep("Rik",names(a)))))
 
-#TEST HIPERGEOMETRICO PARA SOBRERREPRESENTACION--------------------------
+# TEST HIPERGEOMETRICO PARA SOBRERREPRESENTACION-------------------------
 # hgs es una matriz con resultados del test: pvalue para cada PC
 
 pca <- pcaAsub
@@ -75,7 +75,7 @@ end_time <- Sys.time()
 cat(sprintf("Tardó %.2f minutos\n", end_time-start_time))
 
 #------------------------------------------------------------------------
-#REPRESENTACION VISUAL---------------------------------------------------
+# REPRESENTACION VISUAL--------------------------------------------------
 load("~/Documents/dimensionality/results/Ahg.RData")
 
 nervdev_offs <- get("GO:0007399",GOBPOFFSPRING) # nervous system development (incluye neurogen)
@@ -135,7 +135,7 @@ names(genes_enbps) <- hyperg_df[,"GOBPID"]
 # comparar distribucion de genes importantes en BP vs dist de todos los genes que no estan en BP
 
 #------------------------------------------------------------------------
-#SEMANTIC SIMILARITY-----------------------------------------------------
+# SEMANTIC SIMILARITY----------------------------------------------------
 library(GOSemSim)
 library("igraph")
 
@@ -153,12 +153,17 @@ go_exp <- mmGO@geneAnno[ind_ev,"GO"]
 
 go_list <- intersect(rownames(gopcs01), go_exp)
 
+sim <- mgoSim(go_list,go_list,semData = mmGO, measure ="Resnik",combine=NULL)
+sim2 <- mgoSim(go_list,go_list,semData = mmGO, measure ="Wang",combine=NULL)
+
 #solo faltaria ver como calcula Resnik. normaliza? Ver que dan distinto:
 goSim("GO:0007399", "GO:0007399", semData=mmGO, measure="Resnik") #ejemplo: nerv sys dev
 mmGO@IC["GO:0007399"]
 
-sim <- mgoSim(go_list,go_list,semData = mmGO, measure ="Resnik",combine=NULL)
-sim2 <- mgoSim(go_list,go_list,semData = mmGO, measure ="Wang",combine=NULL)
+#si, normaliza pero no se con que:
+diagonal <- diag(sim)
+ic_gopcs <- mmGO@IC[go_list]
+plot(diagonal,ic_gopcs)
 
 #grafo completo
 G <- graph_from_adjacency_matrix(adjmatrix = sim, weighted = TRUE, diag = FALSE, mode = "undirected")
@@ -202,12 +207,23 @@ for (i in 1:(length(colnames(gopcs))-1)){ #para cada pc
   }
   
   fn <- paste0("~/Documents/dimensionality/fig/grafo_resnik_pc",i)
-  png(fn)
+  #png(fn)
   plot.igraph(subG, layout=l[ind_coord,], rescale=FALSE, vertex.size=10,
               vertex.color=adjustcolor(colores3[V(subG)$type], alpha.f=.5), vertex.label=NA,
               edge.width=E(subG)$weight/maximo,
               main=paste("PC #",colnames(gopcs)[i]))
   legend('topright', legend=c('Neuro','PC','Ambos'), pch=21, col="black", pt.bg=colores3)
-  dev.off()
+  #dev.off()
 }
 rm(i, lista_pc, subG, maximo, indices_nerv,indices_pc,ind_coord,fn)
+
+#------------------------------------------------------------------------
+# DISTANCIA ENTRE PCS----------------------------------------------------
+coseno <- cos_sim(gopcs) #le resto la media?
+cos_d <- 1-coseno
+#deberia calcular una distancia con metrica?
+loc <- cmdscale(cos_d)
+x <- loc[, 1]
+y <- loc[, 2]
+plot(x, y, type = "n", xlab = "", ylab = "", asp = 1, axes = FALSE)
+text(x, y, c("PC1","PC2","PC3","PC4","PC5","PC6","PC7","PC8","PC9","PC10"), cex = 0.6)
