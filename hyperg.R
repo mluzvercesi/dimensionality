@@ -112,6 +112,8 @@ heatmap.2(gopcs,trace="none") # todo
 heatmap.2(sqrt(gopcs), trace="none") #reescalada
 heatmap(sqrt(gopcs[gopcs[,"Neuro"]==.001,])) # solo las neuro, reescaladas
 
+load("~/Documents/dimensionality/results/gopcs.RData")
+gopcs <- gopcsA
 
 if(FALSE){
   gopcs01 <- gopcs
@@ -137,13 +139,15 @@ names(genes_enbps) <- hyperg_df[,"GOBPID"]
 #------------------------------------------------------------------------
 # SEMANTIC SIMILARITY----------------------------------------------------
 library(GOSemSim)
-library("igraph")
+library(igraph)
 
 # OJO CON LA FUNCION godata
 mmGO <- godata("org.Mm.eg.db", ont="BP", computeIC=FALSE)
 mmGO@IC <- computarIC("org.Mm.eg.db", keytype = "ENTREZID", ont = "BP")
+# Arme una funcion de info content porque al crear al environment global,
+# no usa GO.db entonces faltan algunos GOIDs
 
-# Por que hay elementos que no existen en Mm, si hgs fue creado usando Mm? Tampoco existen en el global ??
+# Por que hay elementos que no existen en Mm, si hgs fue creado usando Mm?
 
 #ademas, sacar cosas que sobran de la lista. Usar unicamente evidencia experimental
 # fuente: http://geneontology.org/docs/guide-go-evidence-codes/
@@ -156,11 +160,11 @@ go_list <- intersect(rownames(gopcs01), go_exp)
 sim <- mgoSim(go_list,go_list,semData = mmGO, measure ="Resnik",combine=NULL)
 sim2 <- mgoSim(go_list,go_list,semData = mmGO, measure ="Wang",combine=NULL)
 
-#solo faltaria ver como calcula Resnik. normaliza? Ver que dan distinto:
+#solo faltaria ver como calcula Resnik. Ver que dan distinto:
 goSim("GO:0007399", "GO:0007399", semData=mmGO, measure="Resnik") #ejemplo: nerv sys dev
 mmGO@IC["GO:0007399"]
 
-#si, normaliza pero no se con que:
+#normaliza pero no se con que:
 diagonal <- diag(sim)
 ic_gopcs <- mmGO@IC[go_list]
 plot(diagonal,ic_gopcs)
@@ -220,10 +224,17 @@ rm(i, lista_pc, subG, maximo, indices_nerv,indices_pc,ind_coord,fn)
 #------------------------------------------------------------------------
 # DISTANCIA ENTRE PCS----------------------------------------------------
 coseno <- cos_sim(gopcs) #le resto la media?
-cos_d <- 1-coseno
-#deberia calcular una distancia con metrica?
-loc <- cmdscale(cos_d)
+
+distcos <- 1-coseno #deberia calcular otra distancia?
+loc <- cmdscale(distcos)
 x <- loc[, 1]
 y <- loc[, 2]
 plot(x, y, type = "n", xlab = "", ylab = "", asp = 1, axes = FALSE)
 text(x, y, c("PC1","PC2","PC3","PC4","PC5","PC6","PC7","PC8","PC9","PC10"), cex = 0.6)
+
+h <- hclust(as.dist(distcos),method = "ward.D")
+plot(h)
+
+ipca<-4
+igo<-which(gopcs01[,ipca]==0)
+print(as.character(Term(names(igo))))
