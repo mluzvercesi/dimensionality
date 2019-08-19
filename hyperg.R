@@ -229,12 +229,40 @@ distcos <- 1-coseno #deberia calcular otra distancia?
 loc <- cmdscale(distcos)
 x <- loc[, 1]
 y <- loc[, 2]
+nombres <- colnames(gopcs)
+for (i in 1:(length(nombres)-1)){
+  nombres[i] <- paste0("PC",nombres[i])
+}
+summaries <- NULL
+for (i in 1:length(nombres)){
+  igo <- which(gopcs01[,i]==0)
+  
+  indices_nerv <- names(igo) %in% nervdev_offs
+  terms_si <- as.character(Term(names(igo[indices_nerv])))
+  terms_si <- paste(terms_si, collapse="</br>")
+  terms_si <- paste0("</br><b>",terms_si, "</b>")
+  
+  terms_no <- as.character(Term(names(igo[!indices_nerv])))
+  terms_no <- paste(terms_no, collapse="</br>")
+  terms_no <- paste0("</br>",terms_no)
+  
+  go_terms_order <- paste(terms_si, terms_no)
+  
+  summaries <- c(summaries, go_terms_order)
+}
+rm(i, igo, go_terms_i)
+
 plot(x, y, type = "n", xlab = "", ylab = "", asp = 1, axes = FALSE)
-text(x, y, c("PC1","PC2","PC3","PC4","PC5","PC6","PC7","PC8","PC9","PC10"), cex = 0.6)
+text(x, y, nombres, cex = 0.6)
+
+
+library(plotly)
+ax <- list(title = "", zeroline = F, showline = F, showticklabels = F, showgrid = F)
+plot_ly (x=x,y=y, type='scatter', mode='text',
+         text=nombres, hovertext=summaries, hoverinfo='text', showlegend=F, 
+         hoverlabel=list(namelength=-1, font=list(size=8)))%>%
+  layout(xaxis = ax, yaxis = ax)
 
 h <- hclust(as.dist(distcos),method = "ward.D")
 plot(h)
 
-ipca<-4
-igo<-which(gopcs01[,ipca]==0)
-print(as.character(Term(names(igo))))
