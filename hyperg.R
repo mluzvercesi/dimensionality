@@ -1,4 +1,4 @@
-source("~/Documents/funciones.R")
+source("~/Documents/dimensionality/funciones.R")
 #------------------------------------------------------------------------
 load("~/Documents/dimensionality/results/Apca.RData")
 load("~/Documents/dimensionality/results/Asubconjunto.RData")
