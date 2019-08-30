@@ -266,3 +266,4 @@ plot_ly (x=x,y=y, type='scatter', mode='text',
 h <- hclust(as.dist(distcos),method = "ward.D")
 plot(h)
 
+# fgsea: Update old packages: 'AnnotationDbi', 'foreign', 'IRanges', 'nlme', 'Rcpp', 'RSQLite', 'sys'

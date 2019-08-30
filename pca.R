@@ -1,9 +1,9 @@
-# FUNCIONES--------------------------------------------------------------
-source("~/Documents/funciones.R")
+# FUNCIONES
+source("~/Documents/dimensionality/funciones.R")
 #------------------------------------------------------------------------
-# MAIN-------------------------------------------------------------------
+# MAIN
 
-dataset <- 3 # (1,2,3) son (A,B,C)
+dataset <- 1 # (1,2,3) son (A,B,C)
 
 # Para leer los archivos
 datasets <- list("GSE95315/GSE95315_10X_expression_data.tab.gz",
@@ -14,9 +14,9 @@ X <- as.matrix(read.table(file, header=TRUE, row.names = 1,as.is=TRUE))
 
 # Para cargarlos
 datasets <- list("A","B","C")
-load(paste0("~/Documents/dataset",datasets[dataset],".RData"))
-load(paste0("~/Documents/results/",datasets[dataset],"subconjunto.RData"))
-X <- dataCsub
+load(paste0("~/Documents/dimensionality/dataset",datasets[dataset],".RData"))
+load(paste0("~/Documents/dimensionality/results/",datasets[dataset],"subconjunto.RData"))
+X <- dataAsub
 
 
 N_gen  <- dim(X)[1]
