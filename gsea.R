@@ -61,12 +61,48 @@ Z <- t(Z) #filas = genes; columnas = celulas
 # save(Z,gopcsA,file="~/Documents/dimensionality/results/gseaA.RData")
 load("~/Documents/dimensionality/results/gseaA.RData")
 
-zranks <- Z[,1]
+rownames(Z) <- sym2eg(rownames(Z))
 
 gonames <- rownames(gopcsA)
 Ngo <- length(gonames)
+Ncells <- dim(Z)[2]
+go_list <- list() #lista (de goids) de listas (de genes en cada goid)
+# genes de cada goid
+go_terms <- lapply(gonames,function(x){ mappedLkeys(org.Mm.egGO2ALLEGS[x]) })
+go_list[gonames] <- go_terms
 
-# falta hacer una lista (de goids) de listas (de genes de cada categoria)
-goids <- gopcsA[,1]
+# Matrices: pvalue, p BH-adjusted, ES, NES
+cells.pval <- matrix(rep(0.0, Ngo*Ncells), nrow=Ngo, ncol=Ncells)
+rownames(cells.pval) <- gonames
+colnames(cells.pval) <- colnames(Z)
+rm(gonames,go_terms,Ngo,Ncells)
 
-gsea_res <- fgsea(pathways = goids, stats = zranks, nperm = 10000)
+cells.padj <- cells.pval
+cells.es <- cells.pval
+cells.nes <- cells.pval
+
+load("~/Documents/dimensionality/results/fgsea_res_incomp.RData")
+# fgsea devuelve tabla de 8 variables: pathway, pval, padj, ES, NES, nMoreExtreme, size, leadingEdge
+Ncells <- dim(Z)[2]
+start_time <- Sys.time()
+j <- i
+dospor <- round(0.02*Ncells)
+for (i in j:Ncells){
+  if(i%%dospor==0){
+    p <- 100*i/Ncells
+    cat(sprintf("%.1f ", p))
+  }
+  zranks <- Z[,i]
+  gsea_res <- fgsea(pathways = go_list, stats = zranks, nperm = 1000)
+  cells.pval[,i] <- gsea_res$pval
+  cells.padj[,i] <- gsea_res$padj
+  cells.es[,i] <- gsea_res$ES
+  cells.nes[,i] <- gsea_res$NES
+}
+end_time <- Sys.time()
+cat(sprintf("Tardó %.2f minutos\n", end_time-start_time))
+# en 1.968373 horas hizo 1553 de 2932 (la mitad) con 10k permutaciones
+# lo cambie a 1k permutaciones, correrlo de nuevo para que todas tengan la misma cantidad?
+
+# ejemplo de grafico de ES
+plotEnrichment(pathway = go_list[[1]], stats = Z[,1], gseaParam = 1, ticksSize = 0.2)
