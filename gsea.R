@@ -4,7 +4,7 @@ library(fgsea)
 library(org.Mm.eg.db)
 #------------------------------------------------------------------------
 # Pre procesamiento
-load(paste0("~/Documents/dimensionality/results/Asubconjunto.RData"))
+load("~/Documents/dimensionality/results/Asubconjunto.RData")
 rm(pcaAsub,pcaAsub_scaled)
 X <- dataAsub
 
@@ -116,10 +116,13 @@ plot(x, y, type = "n", xlab = "", ylab = "", asp = 1, axes = FALSE)
 text(x, y, colnames(logp), cex = 0.6)
 
 sim.nes <- cos_sim(cells.nes) 
-# Hay NaN en los resultados de NES, 42 valores en 9 celulas (en cada uno de ellos, pval=1). ??
+
+# NOTA: Hay NaN en los resultados de NES, 42 valores en 9 celulas (en cada uno de ellos, pval=1). ??
 
 #------------------------------------------------------------------------
 # Topologia
-# Each cell is connected to its K (5-100) most similar cells, obtained using Euclidean distances on the PC-reduced expression space
+# Cell connected to its K (5-100) most similar cells, obtained using Euclidean distances on the PC-reduced expression space
 library(igraph)
 
+load("~/Documents/dimensionality/results/Asubconjunto.RData")
+rm(pcaAsub_scaled)
