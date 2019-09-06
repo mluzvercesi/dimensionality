@@ -1,5 +1,7 @@
 load("~/Documents/dimensionality/results/Asubconjunto.RData")
-library(fgsea)
+library(fgsea) 
+# fgsea: Update old packages: 'AnnotationDbi', 'foreign', 'IRanges', 'nlme', 'Rcpp', 'RSQLite', 'sys'
+library(org.Mm.eg.db)
 #------------------------------------------------------------------------
 # Pre procesamiento
 load(paste0("~/Documents/dimensionality/results/Asubconjunto.RData"))
@@ -54,6 +56,7 @@ Xlog[X_1 != 0] <- log2(X_1[X_1 != 0])
 
 Z <- apply(Xlog, 1, function(x){(x-mean(x))/norm_vect(x-mean(x))})
 Z <- t(Z) #filas = genes; columnas = celulas
+rownames(Z) <- sym2eg(rownames(Z))
 
 #------------------------------------------------------------------------
 # GSEA
@@ -61,33 +64,30 @@ Z <- t(Z) #filas = genes; columnas = celulas
 # save(Z,gopcsA,file="~/Documents/dimensionality/results/gseaA.RData")
 load("~/Documents/dimensionality/results/gseaA.RData")
 
-rownames(Z) <- sym2eg(rownames(Z))
-
 gonames <- rownames(gopcsA)
 Ngo <- length(gonames)
 Ncells <- dim(Z)[2]
 go_list <- list() #lista (de goids) de listas (de genes en cada goid)
-# genes de cada goid
-go_terms <- lapply(gonames,function(x){ mappedLkeys(org.Mm.egGO2ALLEGS[x]) })
+go_terms <- lapply(gonames,function(x){ mappedLkeys(org.Mm.egGO2ALLEGS[x]) }) # genes de cada goid
 go_list[gonames] <- go_terms
 
-# Matrices: pvalue, p BH-adjusted, ES, NES
+# ejemplo de grafico de ES
+# plotEnrichment(pathway = go_list[[1]], stats = Z[,1], gseaParam = 1, ticksSize = 0.2)
+
+# Matrices: p value, p BH-adjusted, ES, NES
 cells.pval <- matrix(rep(0.0, Ngo*Ncells), nrow=Ngo, ncol=Ncells)
 rownames(cells.pval) <- gonames
 colnames(cells.pval) <- colnames(Z)
-rm(gonames,go_terms,Ngo,Ncells)
+rm(gonames,go_terms,Ngo)
 
 cells.padj <- cells.pval
 cells.es <- cells.pval
 cells.nes <- cells.pval
 
-load("~/Documents/dimensionality/results/fgsea_res_incomp.RData")
 # fgsea devuelve tabla de 8 variables: pathway, pval, padj, ES, NES, nMoreExtreme, size, leadingEdge
-Ncells <- dim(Z)[2]
-start_time <- Sys.time()
-j <- i
 dospor <- round(0.02*Ncells)
-for (i in j:Ncells){
+start_time <- Sys.time()
+for (i in 1:Ncells){
   if(i%%dospor==0){
     p <- 100*i/Ncells
     cat(sprintf("%.1f ", p))
@@ -99,10 +99,27 @@ for (i in j:Ncells){
   cells.es[,i] <- gsea_res$ES
   cells.nes[,i] <- gsea_res$NES
 }
+rm(i,p,dospor,zranks,gsea_res)
 end_time <- Sys.time()
-cat(sprintf("Tardó %.2f minutos\n", end_time-start_time))
-# en 1.968373 horas hizo 1553 de 2932 (la mitad) con 10k permutaciones
-# lo cambie a 1k permutaciones, correrlo de nuevo para que todas tengan la misma cantidad?
+print(end_time-start_time)
+rm(start_time,end_time)
+# 1.968373 hs, 1553 de 2932 con 10k permutaciones, el resto con 1k (res_mix.RData)
 
-# ejemplo de grafico de ES
-plotEnrichment(pathway = go_list[[1]], stats = Z[,1], gseaParam = 1, ticksSize = 0.2)
+#------------------------------------------------------------------------
+# Similitud
+sim.log <- cos_sim(logp)
+dist.log <- 1 - sim.log
+loc <- cmdscale(dist.log)
+x <- loc[, 1]
+y <- loc[, 2]
+plot(x, y, type = "n", xlab = "", ylab = "", asp = 1, axes = FALSE)
+text(x, y, colnames(logp), cex = 0.6)
+
+sim.nes <- cos_sim(cells.nes) 
+# Hay NaN en los resultados de NES, 42 valores en 9 celulas (en cada uno de ellos, pval=1). ??
+
+#------------------------------------------------------------------------
+# Topologia
+# Each cell is connected to its K (5-100) most similar cells, obtained using Euclidean distances on the PC-reduced expression space
+library(igraph)
+
