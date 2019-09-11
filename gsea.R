@@ -117,7 +117,7 @@ text(x, y, colnames(logp), cex = 0.6)
 
 sim.nes <- cos_sim(cells.nes) 
 
-# NOTA: Hay NaN en los resultados de NES, 42 valores en 9 celulas (en cada uno de ellos, pval=1). ??
+# NOTA: Hay NaN en los resultados de NES, 42 valores en 9 celulas (obs: en cada uno de ellos, pval=1). ??
 
 #------------------------------------------------------------------------
 # Topologia
@@ -126,3 +126,25 @@ library(igraph)
 
 load("~/Documents/dimensionality/results/Asubconjunto.RData")
 rm(pcaAsub_scaled)
+cells_pc <- pcaAsub$x[,1:10] # celulas (filas) representadas en los 10 primeros pcs
+sim_cells <- cos_sim(t(cells_pc))
+cor_cells <- cor(t(cells_pc))
+#---
+# umbral segun histograma
+sim_cells_copy <- sim_cells
+diag(sim_cells_copy) <- NaN
+hist(sim_cells_copy)
+umbralS <- 0.5
+#---
+# umbral si quiero grafo conexo
+diag(sim_cells_copy) <- 0
+umbralS <- min(apply(sim_cells_copy,1,max))
+umbralS <- 0.6
+#---
+adyacencia <- (abs(sim_cells_copy) > umbralS)
+# probar tambien con pesos
+ady_pesos <- sim_cells_copy
+ady_pesos[!adyacencia] <- 0 #cada nodo es su comunidad
+
+G1 <- graph_from_adjacency_matrix(adyacencia, mode="undirected", diag = FALSE)
+comunidades1 <- cluster_louvain(G1)

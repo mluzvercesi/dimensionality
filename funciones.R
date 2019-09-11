@@ -1,5 +1,5 @@
-# load("~/Documents/results/myworkspace.RData")
-# save(object1,object2,file="~/Documents/results/myworkspace.RData")
+# load("~/Documents/dimensionality/results/myworkspace.RData")
+# save(object1,object2,file="~/Documents/dimensionality/results/myworkspace.RData")
 # require("package") or "package" %in% rownames(installed.packages())
 
 norm_vect <- function(x) {sqrt(sum(x^2))}
@@ -7,7 +7,10 @@ norm_vect <- function(x) {sqrt(sum(x^2))}
 cos_sim <- function(x){
   # calcula matriz de similarity entre columnas de matriz x
   N <- dim(x)[2]
+  nombres <- colnames(x)
   coseno <- matrix(rep(0.0, N*N), nrow=N, ncol=N)
+  colnames(coseno) <- nombres
+  rownames(coseno) <- nombres
   for (i in 1:N){
     X = x[,i]
     X2 = sqrt(sum(X^2))
