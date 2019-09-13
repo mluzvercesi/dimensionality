@@ -107,44 +107,12 @@ rm(start_time,end_time)
 
 #------------------------------------------------------------------------
 # Similitud
+logp <- -log(cells.padj)
 sim.log <- cos_sim(logp)
-dist.log <- 1 - sim.log
-loc <- cmdscale(dist.log)
-x <- loc[, 1]
-y <- loc[, 2]
-plot(x, y, type = "n", xlab = "", ylab = "", asp = 1, axes = FALSE)
-text(x, y, colnames(logp), cex = 0.6)
+cor.log <- cor(logp)
+
+load("~/Documents/dimensionality/results/fgseaA_res.RData")
+# cells.es, cells.nes, cells.padj, cells.pval, sim.log
 
 sim.nes <- cos_sim(cells.nes) 
-
 # NOTA: Hay NaN en los resultados de NES, 42 valores en 9 celulas (obs: en cada uno de ellos, pval=1). ??
-
-#------------------------------------------------------------------------
-# Topologia
-# Cell connected to its K (5-100) most similar cells, obtained using Euclidean distances on the PC-reduced expression space
-library(igraph)
-
-load("~/Documents/dimensionality/results/Asubconjunto.RData")
-rm(pcaAsub_scaled)
-cells_pc <- pcaAsub$x[,1:10] # celulas (filas) representadas en los 10 primeros pcs
-sim_cells <- cos_sim(t(cells_pc))
-cor_cells <- cor(t(cells_pc))
-#---
-# umbral segun histograma
-sim_cells_copy <- sim_cells
-diag(sim_cells_copy) <- NaN
-hist(sim_cells_copy)
-umbralS <- 0.5
-#---
-# umbral si quiero grafo conexo
-diag(sim_cells_copy) <- 0
-umbralS <- min(apply(sim_cells_copy,1,max))
-umbralS <- 0.6
-#---
-adyacencia <- (abs(sim_cells_copy) > umbralS)
-# probar tambien con pesos
-ady_pesos <- sim_cells_copy
-ady_pesos[!adyacencia] <- 0 #cada nodo es su comunidad
-
-G1 <- graph_from_adjacency_matrix(adyacencia, mode="undirected", diag = FALSE)
-comunidades1 <- cluster_louvain(G1)
