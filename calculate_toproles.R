@@ -36,3 +36,14 @@ connector_hubs = big_p[which(big_p %in% big_z)]
 connector_nonhubs = big_p[which(big_p %in% small_z)]
 provincial_hubs = small_p[which(small_p %in% big_z)]
 provincial_nonhubs = small_p[which(small_p %in% small_z)]
+
+
+plot(p_i,z_i)
+plot(p_i[connector_hubs], z_i[connector_hubs], xlim=c(min(z_i),max(z_i)), ylim=c(min(p_i),max(p_i)))
+points(p_i[connector_nonhubs], z_i[connector_nonhubs], col='green')
+points(p_i[provincial_hubs], z_i[provincial_hubs], col='red')
+points(p_i[provincial_nonhubs], z_i[provincial_nonhubs], col='blue')
+
+# puedo buscar las comunidades en este grafico: 
+#c17 <- colnames(ady)[comunidades$membership==17]
+#plot(p_i[c17], z_i[c17], xlim=c(min(p_i),max(p_i)), ylim=c(min(z_i),max(z_i)))
