@@ -57,3 +57,9 @@ for (i in 1:length(comm.sorted)){
   diag(M) <- NaN
   hist(M,main=n)
 }
+
+N <- 2000
+fn <- "C:\\Users\\Luli\\Documents\\Tesis\\dimensionality\\results\\knn.txt"
+header <- paste("(mclheader\nmcltype matrix\ndimensions",paste0(N,"x",N),"\n)\n(mclmatrix\nbegin\n")
+cat(header , file = fn, sep = " ")
+cat(... , file = "", sep = " ", fill = FALSE, labels = NULL, append = TRUE)
