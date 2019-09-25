@@ -36,7 +36,7 @@ for (i in 1:dim(X)[1]){
 }
 rm(i)
 ady <- (A+t(A))/2
-ady <- floor(ady)
+ady <- floor(ady) #matriz de adyacencia de k vecinos mutuos cercanos
 
 #los nodos estan en el mismo orden que en la matriz
 G <- graph_from_adjacency_matrix(ady, mode="undirected", diag = FALSE)
@@ -57,9 +57,26 @@ for (i in 1:length(comm.sorted)){
   diag(M) <- NaN
   hist(M,main=n)
 }
+rm(i)
 
-N <- 2000
-fn <- "C:\\Users\\Luli\\Documents\\Tesis\\dimensionality\\results\\knn.txt"
-header <- paste("(mclheader\nmcltype matrix\ndimensions",paste0(N,"x",N),"\n)\n(mclmatrix\nbegin\n")
-cat(header , file = fn, sep = " ")
-cat(... , file = "", sep = " ", fill = FALSE, labels = NULL, append = TRUE)
+library(hbm)
+# I = 6   #2774 comunidades, max size = 7, despues de 8 iteraciones
+# I = 2   # 739 comunidades, max size= 37, despues de 16 iteraciones
+# I = 1.6 # 128 comunidades, max size= 95, despues de 25 iteraciones, 13 coms de 1
+# I = 1.4 #  50 comunidades, max size=283, despues de 32 iteraciones, 8 coms de 1
+# I = 1.25 # 19 comunidades, max size=691, despues de 56 iteraciones, 7 coms de 1
+com_i2 <- mcl(ady, infl = 2, iter = 300, verbose = TRUE)
+com_i125 <- mcl(ady, infl = 1.25, iter = 300, verbose = TRUE)
+
+
+# con Jaccard, I = 1.25, 28 comunidades, max size=1051, despues de 49 iteraciones, 7 coms de 1
+jacc <- similarity(G, method = "jaccard")
+knn <-  graph_from_adjacency_matrix(jacc, mode="undirected", diag = FALSE)
+com_jac  <- mcl(jacc, infl = 1.25, iter = 300, verbose = TRUE)
+names(com_jac) <- rownames(ady)
+nro_com <- unique(com_jac)
+
+#corregir los numeros de las comunidades para que queden en orden
+
+membership <- com_jac
+g_users <- G
