@@ -40,9 +40,37 @@ ady <- floor(ady) #matriz de adyacencia de k vecinos mutuos cercanos
 
 #los nodos estan en el mismo orden que en la matriz
 G <- graph_from_adjacency_matrix(ady, mode="undirected", diag = FALSE)
-comunidades <- cluster_louvain(G)
-#plot.communities
-#plot.graph
+
+library(hbm)
+# I = 6,    2774 comunidades, max size = 7, 8 iteraciones
+# I = 2,    739 comunidades, max size= 37, 16 iteraciones
+# I = 1.6,  128 comunidades, max size= 95, 25 iteraciones, 13 coms de 1
+# I = 1.4,  50 comunidades, max size=283, 32 iteraciones, 8 coms de 1
+# I = 1.25, 19 comunidades, max size=691, 56 iteraciones, 7 coms de 1
+
+jacc <- similarity(G, method = "jaccard")
+knn <-  graph_from_adjacency_matrix(jacc, mode="undirected", diag = FALSE)
+com_jac  <- mcl(jacc, infl = 1.25, iter = 300, verbose = TRUE) # I=1.25
+# A sub: 28 coms, maxsize=1051, 49 iteraciones, 7 coms de 1
+# A: 96 coms, maxsize=989, 53 iteraciones, 45 coms de 1. NOTA: hay 54 coms con <5 nodos
+
+jacc.io <- ifelse(jacc==0,0,1)
+knn.io <-  graph_from_adjacency_matrix(jacc.io, mode="undirected", diag = FALSE)
+com_jac.io  <- mcl(jacc.io, infl = 1.25, iter = 300, verbose = TRUE)
+
+
+names(com_jac) <- rownames(ady)
+nro_com <- unique(com_jac)
+
+#corrijo los numeros de las comunidades para que queden en orden
+for (i in 1:length(nro_com)){
+  com_jac[com_jac==nro_com[i]] <- i
+}
+rm(i)
+
+#para participacion y z-score (calculate_toproles.R)
+membership <- com_jac
+g_users <- G
 
 #------------------------------------------------------------------------
 #Comparacion rapida: grafo knn vs similarity pval
@@ -58,25 +86,3 @@ for (i in 1:length(comm.sorted)){
   hist(M,main=n)
 }
 rm(i)
-
-library(hbm)
-# I = 6   #2774 comunidades, max size = 7, despues de 8 iteraciones
-# I = 2   # 739 comunidades, max size= 37, despues de 16 iteraciones
-# I = 1.6 # 128 comunidades, max size= 95, despues de 25 iteraciones, 13 coms de 1
-# I = 1.4 #  50 comunidades, max size=283, despues de 32 iteraciones, 8 coms de 1
-# I = 1.25 # 19 comunidades, max size=691, despues de 56 iteraciones, 7 coms de 1
-com_i2 <- mcl(ady, infl = 2, iter = 300, verbose = TRUE)
-com_i125 <- mcl(ady, infl = 1.25, iter = 300, verbose = TRUE)
-
-
-# con Jaccard, I = 1.25, 28 comunidades, max size=1051, despues de 49 iteraciones, 7 coms de 1
-jacc <- similarity(G, method = "jaccard")
-knn <-  graph_from_adjacency_matrix(jacc, mode="undirected", diag = FALSE)
-com_jac  <- mcl(jacc, infl = 1.25, iter = 300, verbose = TRUE)
-names(com_jac) <- rownames(ady)
-nro_com <- unique(com_jac)
-
-#corregir los numeros de las comunidades para que queden en orden
-
-membership <- com_jac
-g_users <- G

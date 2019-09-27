@@ -25,6 +25,7 @@ for(i in 1:length(V(g_users))){
 module_links = modu_map %*% adyacencia #Si mapeo la adyacencia por los modulos tengo la cantidad de links del nodo i a cada modulo.
 
 p_i = 1 - (colSums(module_links ** 2) / (degree(g_users) ** 2)) #Calculo el p-score de Guimera (2005).
+p_i[degree(g_users)==0] <- 0
 
 #Calculo cuales cumplen cada rol.
 small_z = which(z_i < 0)
@@ -39,11 +40,20 @@ provincial_nonhubs = small_p[which(small_p %in% small_z)]
 
 
 plot(p_i,z_i)
-plot(p_i[connector_hubs], z_i[connector_hubs], xlim=c(min(z_i),max(z_i)), ylim=c(min(p_i),max(p_i)))
-points(p_i[connector_nonhubs], z_i[connector_nonhubs], col='green')
-points(p_i[provincial_hubs], z_i[provincial_hubs], col='red')
-points(p_i[provincial_nonhubs], z_i[provincial_nonhubs], col='blue')
+abline(v=mean(p_i),lwd=2, lty=2,col='green')
+abline(h=0,lwd=2, lty=2,col='green')
 
-# puedo buscar las comunidades en este grafico: 
-#c17 <- colnames(ady)[comunidades$membership==17]
-#plot(p_i[c17], z_i[c17], xlim=c(min(p_i),max(p_i)), ylim=c(min(z_i),max(z_i)))
+# grafico por comunidades
+plot(p_i, z_i, col = rainbow(length(unique(membership)))[membership])
+abline(v=mean(p_i),lwd=2, lty=2)
+abline(h=0,lwd=2, lty=2)
+
+coms1 <- which(table(membership)>10)
+
+for(i in 1:length(coms1)){
+  plot(p_i[membership==coms1[i]], z_i[membership==coms1[i]], col = rainbow(length(coms1))[i], xlab = "p", ylab = "z",
+       xlim=c(min(p_i),max(p_i)),ylim=c(min(z_i),max(z_i)), main=paste0("C",coms1[i], " (",table(membership)[coms1[i]]," nodos)"))
+  abline(v=mean(p_i),lwd=2, lty=2)
+  abline(h=0,lwd=2, lty=2)
+  readline("Press ENTER")     
+}
