@@ -49,15 +49,10 @@ library(hbm)
 # I = 1.25, 19 comunidades, max size=691, 56 iteraciones, 7 coms de 1
 
 jacc <- similarity(G, method = "jaccard")
-knn <-  graph_from_adjacency_matrix(jacc, mode="undirected", diag = FALSE)
+knn <-  graph_from_adjacency_matrix(jacc, mode="undirected", weighted = TRUE, diag = FALSE)
 com_jac  <- mcl(jacc, infl = 1.25, iter = 300, verbose = TRUE) # I=1.25
 # A sub: 28 coms, maxsize=1051, 49 iteraciones, 7 coms de 1
 # A: 96 coms, maxsize=989, 53 iteraciones, 45 coms de 1. NOTA: hay 54 coms con <5 nodos
-
-jacc.io <- ifelse(jacc==0,0,1)
-knn.io <-  graph_from_adjacency_matrix(jacc.io, mode="undirected", diag = FALSE)
-com_jac.io  <- mcl(jacc.io, infl = 1.25, iter = 300, verbose = TRUE)
-
 
 names(com_jac) <- rownames(ady)
 nro_com <- unique(com_jac)
@@ -68,9 +63,23 @@ for (i in 1:length(nro_com)){
 }
 rm(i)
 
+#------------------------------------------------------------------------
+load("~/Documents/dimensionality/results/A_knnjacc.RData") #tiene com_jac y com_jac_sub, knn y knn_sub
+
+nro_com <- unique(com_jac)
+single_com <- nro_com[table(com_jac)==1]
+vecinos <- adjacent_vertices(knn, com_jac %in% single_com)
+vecinos[as.numeric(lapply(vecinos,length))>0]
+
+
 #para participacion y z-score (calculate_toproles.R)
 membership <- com_jac
-g_users <- G
+g_users <- knn
+
+#------------------------------------------------------------------------
+# ejemplos de grafos para ver como es el grafico zP de cada uno
+g_bara <- sample_pa(100, directed = FALSE)
+g_erd <- erdos.renyi.game(100, 1/100)
 
 #------------------------------------------------------------------------
 #Comparacion rapida: grafo knn vs similarity pval
