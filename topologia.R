@@ -27,7 +27,7 @@ diag(X) <- 0
 ordenk <- apply(abs(X),1, function(x){order(x, decreasing = TRUE)})
 # las columnas de ordenk corresponden al orden de las filas de X
 
-k <- 20
+k <- 40
 A <- matrix(0L, nrow = dim(X)[1], ncol = dim(X)[2])
 rownames(A) <- rownames(X)
 colnames(A) <- colnames(X)
@@ -51,8 +51,8 @@ library(hbm)
 jacc <- similarity(G, method = "jaccard")
 knn <-  graph_from_adjacency_matrix(jacc, mode="undirected", weighted = TRUE, diag = FALSE)
 com_jac  <- mcl(jacc, infl = 1.25, iter = 300, verbose = TRUE) # I=1.25
-# A sub: 28 coms, maxsize=1051, 49 iteraciones, 7 coms de 1
-# A: 96 coms, maxsize=989, 53 iteraciones, 45 coms de 1. NOTA: hay 54 coms con <5 nodos
+# A sub: 11 coms, maxsize=1089, 39 iteraciones, 4 coms de 1
+# A: 43 coms, maxsize=2743, 60 iteraciones, 15 coms de 1. NOTA: hay 19 coms con <5 nodos
 
 names(com_jac) <- rownames(ady)
 nro_com <- unique(com_jac)
@@ -64,8 +64,56 @@ for (i in 1:length(nro_com)){
 rm(i)
 
 #------------------------------------------------------------------------
-load("~/Documents/dimensionality/results/A_knnjacc.RData") #tiene com_jac y com_jac_sub, knn y knn_sub
+load("~/Documents/dimensionality/results/A_knnjacc_k40.RData") #tiene com_jac y com_jac_sub, knn y knn_sub
 
+metadata <- read.csv("~/Documents/dimensionality/Neurogenesis/Linnarson_NatNeuro2018/GSE95315/GSE95315_metadata.txt", 
+                     sep="\t", header=TRUE, row.names=1)
+rownames(metadata) <- sub("-",".",rownames(metadata))
+rownames(metadata) <- paste0("X",rownames(metadata))
+
+celltypes <- as.character(metadata[names(com_jac),"cell_type"])
+names(celltypes) <- names(com_jac)
+
+contingencia <- table(com_jac,celltypes)
+cntg_rows <- rowSums(contingencia)
+cntg_cols <- colSums(contingencia)
+
+cntg_uni <- contingencia
+cntg_max <- contingencia
+cntg_min <- contingencia
+
+for (i in 1:dim(contingencia)[1]){
+  for (j in 1:dim(contingencia)[2]){
+    cntg_uni[i,j] <- contingencia[i,j]/(cntg_rows[i]+cntg_cols[j]-contingencia[i,j])
+    cntg_max[i,j] <- contingencia[i,j]/max(cntg_rows[i],cntg_cols[j])
+    cntg_min[i,j] <- contingencia[i,j]/min(cntg_rows[i],cntg_cols[j])
+  }
+}
+rm(i,j)
+
+library(fossil)
+celltypes_nro <- celltypes
+for (i in 1:length(unique(celltypes))){
+  celltypes_nro[celltypes==unique(celltypes)[i]] <- i
+}
+rm(i)
+rand.index(com_jac, celltypes_nro)
+adj.rand.index(com_jac, celltypes_nro)
+
+
+#Entropia
+S_rows <- apply(cntg_uni,1,function(x){-log(x)*x})
+S_rows <- t(S_rows)
+S_rows[cntg_uni==0] <- 0
+M <- dim(cntg_uni)[2]
+S_row_max <- -log(1/M)
+
+S_cols <- apply(cntg_uni,2,function(x){-log(x)*x})
+S_cols[cntg_uni==0] <- 0
+N <- dim(cntg_uni)[1]
+S_col_max <- -log(1/N)
+
+#------------------------------------------------------------------------
 nro_com <- unique(com_jac)
 single_com <- nro_com[table(com_jac)==1]
 vecinos <- adjacent_vertices(knn, com_jac %in% single_com)
@@ -75,11 +123,6 @@ vecinos[as.numeric(lapply(vecinos,length))>0]
 #para participacion y z-score (calculate_toproles.R)
 membership <- com_jac
 g_users <- knn
-
-#------------------------------------------------------------------------
-# ejemplos de grafos para ver como es el grafico zP de cada uno
-g_bara <- sample_pa(100, directed = FALSE)
-g_erd <- erdos.renyi.game(100, 1/100)
 
 #------------------------------------------------------------------------
 #Comparacion rapida: grafo knn vs similarity pval

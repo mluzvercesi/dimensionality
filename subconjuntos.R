@@ -4,7 +4,7 @@ datasets <- list("GSE95315/GSE95315_metadata.txt",
 #---------------
 #para dataset A:
 dataset <- 1 # (1,2,3) son (A,B,C)
-metadata <- read.csv(paste0("~/Documents/Neurogenesis/Linnarson_NatNeuro2018/",datasets[dataset]), 
+metadata <- read.csv(paste0("~/Documents/dimensionality/Neurogenesis/Linnarson_NatNeuro2018/",datasets[dataset]), 
                      sep="\t", header=TRUE, row.names=1)
 
 rownames(metadata) <- sub("-",".",rownames(metadata))
