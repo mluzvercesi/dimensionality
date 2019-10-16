@@ -4,6 +4,29 @@
 
 norm_vect <- function(x) {sqrt(sum(x^2))}
 #------------------------------------------------------------------------
+indice.rand <- function (group1, group2){
+  # Devuelve:
+  # r = indice Rand
+  # a = cantidad de pares juntos en ambas particiones y su fraccion
+  # b = cantidad de pares separados en ambas particiones y su fraccion
+  # cd= cantidad de pares juntos en un grupo y separados en el otro y su fraccion
+  if (length(group1)==length(group2)){
+    x <- abs(sapply(group1, function(x) x - group1))
+    x[x > 1] <- 1
+    y <- abs(sapply(group2, function(x) x - group2))
+    y[y > 1] <- 1
+    cuentas <- table(x+y)
+    a <- (cuentas[[1]]-length(group1))/2 #cantidad de 0s sin diagonal
+    b <- cuentas[[3]]/2 #cantidad de 2s
+    cd <- cuentas[[2]]/2 #cantidad de 1s
+    n <- a+b+cd
+    res <- list('r'=(a+b)/n,'a'=c(a, a/n),'b'=c(b, b/n),'cd'=c(cd, cd/n))
+    return(res)
+  }else{
+    print("Los grupos son diferentes")
+  }
+}
+#------------------------------------------------------------------------
 cos_sim <- function(x){
   # calcula matriz de similarity entre columnas de matriz x
   N <- dim(x)[2]
