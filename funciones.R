@@ -44,6 +44,7 @@ cos_sim <- function(x){
       coseno[j,i] = coseno[i,j]
     }
   }
+  # coseno <- (t(x) %*% x) / (sqrt( y %*% t(y) ))
   return(coseno)
 }
 #------------------------------------------------------------------------

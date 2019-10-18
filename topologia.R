@@ -9,6 +9,7 @@ cor.log <- cor(logp)
 
 sim.nes <- cos_sim(cells.nes) 
 # NOTA: Hay NaN en los resultados de NES, 42 valores en 9 celulas (obs: en cada uno de ellos, pval=1). ??
+# NES: enrichment score normalized to mean enrichment of random samples of the same size
 
 load("~/Documents/dimensionality/results/fgseaA_res.RData") # cells.es, cells.nes, cells.padj, cells.pval, sim.log
 #------------------------------------------------------------------------
@@ -17,7 +18,7 @@ load("~/Documents/dimensionality/results/fgseaA_res.RData") # cells.es, cells.ne
 # Cell connected to its K (5-100) most similar cells, obtained using Euclidean distances on the PC-reduced expression space
 
 load("~/Documents/dimensionality/results/Asubconjunto.RData")
-rm(pcaAsub_scaled)
+rm(pcaAsub_scaled, dataAsub)
 cells_pc <- pcaAsub$x[,1:10] # celulas (filas) representadas en los 10 primeros pcs
 cor_cells <- cor(t(cells_pc))
 
@@ -26,13 +27,14 @@ diag(X) <- 0
 # knn: ordeno cada fila (modulo), me quedo con los k mayores (k es umbral)
 ordenk <- apply(abs(X),1, function(x){order(x, decreasing = TRUE)})
 # las columnas de ordenk corresponden al orden de las filas de X
-
 k <- 40
+ordenk <- ordenk[1:k,]
+
 A <- matrix(0L, nrow = dim(X)[1], ncol = dim(X)[2])
 rownames(A) <- rownames(X)
 colnames(A) <- colnames(X)
 for (i in 1:dim(X)[1]){
-  A[i,ordenk[1:k,i]] <- 1
+  A[i,ordenk[,i]] <- 1 #X[ordenk[,i],i]
 }
 rm(i)
 ady <- (A+t(A))/2
@@ -70,20 +72,18 @@ which(components(knn_sub)$membership>1)
 table(com_jac_sub)
 com_jac_sub[which(components(knn_sub)$membership>1)]
 
-lcc_sub <- which(components(knn_sub)$membership==1)
-
 components(knn)$csize
 components(knn.jac)$csize
 com_jac[components(knn)$membership %in% which(components(knn)$csize==1)]
 
-lcc <- components(knn)$membership %in% which(components(knn)$csize==1)
-lcc <- !lcc
+lcc <- components(knn.jac)$membership %in% which(components(knn.jac)$csize>1)
+lcc_sub <- components(knn.jac_sub)$membership %in% which(components(knn.jac_sub)$csize>1)
 
 knn_lcc <- induced_subgraph(knn, lcc, impl = "copy_and_delete")
 knn_sub_lcc <- induced_subgraph(knn_sub, lcc_sub, impl = "copy_and_delete")
 
 #------------------------------------------------------------------------
-load("~/Documents/dimensionality/results/A_knnjacc_k40.RData") #tiene com_jac y com_jac_sub, knn.jac y knn.jac_sub
+load("~/Documents/dimensionality/results/A_knn40.RData") #tiene com_jac, com_jac_sub, knn, knn_sub, knn.jac, knn.jac_sub
 
 metadata <- read.csv("~/Documents/dimensionality/Neurogenesis/Linnarson_NatNeuro2018/GSE95315/GSE95315_metadata.txt", 
                      sep="\t", header=TRUE, row.names=1)
@@ -99,6 +99,27 @@ for (i in 1:length(unique(celltypes))){
   celltypes_nro[celltypes==unique(celltypes)[i]] <- i
 }
 rm(i)
+
+# Indice Rand
+indice.rand(com_jac, celltypes_nro)
+
+library(fossil)
+rand.index(com_jac, celltypes_nro)
+adj.rand.index(com_jac, celltypes_nro)
+
+rand.index(com_jac_sub, celltypes_nro[names(com_jac_sub)])
+adj.rand.index(com_jac_sub, as.numeric(factor(celltypes_nro[names(com_jac_sub)])))
+
+# Asortatividad de etiquetas MCL y celltype
+assortativity_nominal(knn.jac, types=com_jac, directed=FALSE)
+assortativity_nominal(knn.jac_sub, types=com_jac_sub, directed=FALSE)
+
+assortativity_nominal(knn.jac, types=celltypes_nro, directed=FALSE)
+assortativity_nominal(knn.jac_sub, types=celltypes_nro[names(com_jac_sub)], directed=FALSE)
+
+# Asortatividad "vectorial" usando similitud entre vectores ES, NES, pvalue, adj.pvalue
+sim.es <- cos_sim(cells.es)
+
 
 
 contingencia <- table(com_jac,celltypes)
@@ -118,17 +139,6 @@ for (i in 1:dim(contingencia)[1]){
 }
 rm(i,j)
 
-
-indice.rand(com_jac, celltypes_nro)
-library(fossil)
-rand.index(com_jac, celltypes_nro)
-adj.rand.index(com_jac, celltypes_nro)
-
-
-# Asortatividad
-# tengo que agregar los atributos mcl y cell al grafo
-set_vertex_attr(knn.jac, "mcl", value=com_jac) #?
-assortativity_nominal(knn.jac, types=V(knn.jac)$mcl)
 
 #Entropia
 S_rows <- apply(cntg_uni,1,function(x){-log(x)*x})
