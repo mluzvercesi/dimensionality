@@ -29,22 +29,11 @@ indice.rand <- function (group1, group2){
 #------------------------------------------------------------------------
 cos_sim <- function(x){
   # calcula matriz de similarity entre columnas de matriz x
-  N <- dim(x)[2]
+  y <- colSums(x^2)
+  coseno <- (t(x) %*% x) / (sqrt( y %*% t(y) ))
   nombres <- colnames(x)
-  coseno <- matrix(rep(0.0, N*N), nrow=N, ncol=N)
   colnames(coseno) <- nombres
   rownames(coseno) <- nombres
-  for (i in 1:N){
-    X = x[,i]
-    X2 = sqrt(sum(X^2))
-    for (j in i:N){
-      Y = x[,j]
-      Y2 = sqrt(sum(Y^2))
-      coseno[i,j] = sum(X*Y)/(X2*Y2)
-      coseno[j,i] = coseno[i,j]
-    }
-  }
-  # coseno <- (t(x) %*% x) / (sqrt( y %*% t(y) ))
   return(coseno)
 }
 #------------------------------------------------------------------------
