@@ -3,15 +3,17 @@ library(hbm) #para clustering MCL
 
 #------------------------------------------------------------------------
 # Similitud GSEA
+load("~/Documents/dimensionality/results/fgseaA_res.RData") # cells.es, cells.nes, cells.padj, cells.pval, asort
+# asort es la tabla de valores de asortatividad calculado con todas las distintas medidas
+
 logp <- -log(cells.padj)
 sim.log <- cos_sim(logp)
 cor.log <- cor(logp)
 
-sim.nes <- cos_sim(cells.nes) 
+sim.es <- cos_sim(cells.es) 
+
 # NOTA: Hay NaN en los resultados de NES, 42 valores en 9 celulas (obs: en cada uno de ellos, pval=1). ??
 # NES: enrichment score normalized to mean enrichment of random samples of the same size
-
-load("~/Documents/dimensionality/results/fgseaA_res.RData") # cells.es, cells.nes, cells.padj, cells.pval, sim.log
 #------------------------------------------------------------------------
 # Topologia
 # Primero armo el grafo knn
@@ -67,9 +69,9 @@ rm(i)
 # me tengo que quedar con el largest connected component ahora o entre knn y jaccard. miro que coincidan:
 components(knn_sub)$csize
 components(knn.jac_sub)$csize
+table(com_jac_sub)
 which(components(knn.jac_sub)$membership>1)
 which(components(knn_sub)$membership>1)
-table(com_jac_sub)
 com_jac_sub[which(components(knn_sub)$membership>1)]
 
 components(knn)$csize
@@ -93,6 +95,10 @@ rownames(metadata) <- paste0("X",rownames(metadata))
 celltypes <- as.character(metadata[names(com_jac),"cell_type"])
 names(celltypes) <- names(com_jac)
 
+celltypes_sub <- as.character(metadata[names(com_jac_sub),"cell_type"])
+names(celltypes_sub) <- names(com_jac_sub)
+
+
 celltypes_nro <- rep(0, length(celltypes))
 names(celltypes_nro) <- names(celltypes)
 for (i in 1:length(unique(celltypes))){
@@ -110,6 +116,7 @@ adj.rand.index(com_jac, celltypes_nro)
 rand.index(com_jac_sub, celltypes_nro[names(com_jac_sub)])
 adj.rand.index(com_jac_sub, as.numeric(factor(celltypes_nro[names(com_jac_sub)])))
 
+
 # Asortatividad de etiquetas MCL y celltype
 assortativity_nominal(knn.jac, types=com_jac, directed=FALSE)
 assortativity_nominal(knn.jac_sub, types=com_jac_sub, directed=FALSE)
@@ -117,8 +124,47 @@ assortativity_nominal(knn.jac_sub, types=com_jac_sub, directed=FALSE)
 assortativity_nominal(knn.jac, types=celltypes_nro, directed=FALSE)
 assortativity_nominal(knn.jac_sub, types=celltypes_nro[names(com_jac_sub)], directed=FALSE)
 
-# Asortatividad "vectorial" usando similitud entre vectores ES, NES, pvalue, adj.pvalue
-sim.es <- cos_sim(cells.es)
+
+# Asortatividad vectorial por comunidad
+ncoms <- unique(com_jac_sub[lcc_sub])
+mean_es <- matrix(0,ncol=length(ncoms), nrow=dim(cells.es)[1])
+median_es <- matrix(0,ncol=length(ncoms), nrow=dim(cells.es)[1])
+rownames(mean_es) <- rownames(cells.es)
+
+for (i in 1:length(ncoms)){
+  nombres <- which(com_jac_sub[lcc_sub]==ncoms[i])
+  tamanio <- table(com_jac_sub[lcc_sub])[i]
+  
+  #mean_es[,i] <- apply(cells.es[,nombres],1,mean)
+  #median_es[,i] <- apply(cells.es[,nombres],1,median)
+  
+  red <- induced_subgraph(knn_sub, nombres)
+  r <- assortativity_vect(red, sim.es[nombres,nombres])
+  cat("Comunidad:", ncoms[i], "- Tamaño:", tamanio, "- Asortatividad: ",r,"\n")
+}
+
+for (i in 1:length(unique(celltypes))){
+  nombres <- which(celltypes[lcc_sub]==unique(celltypes)[i])
+  tamanio <- table(celltypes[lcc_sub])[i]
+  
+  red <- induced_subgraph(knn_sub, nombres)
+  r <- assortativity_vect(red, sim.es[nombres,nombres])
+  cat("Comunidad:", unique(celltypes)[i], "- Tamaño:", tamanio, "- Asortatividad: ",r,"\n")
+}
+
+
+# silhouette
+sil <- silhouette(com_jac_sub, dmatrix = 1-sim.es, full=TRUE)
+x11()
+plot(sil)
+
+
+#distribucion (histograma) de similitud entre pares, por comunidad
+par(mfrow=c(2,2))
+hist(sim.es[which(com_jac_sub[lcc_sub]==ncoms[1]), which(com_jac_sub[lcc_sub]==ncoms[1])], main=paste("C1 tamaño",table(com_jac_sub[lcc_sub])[1]), xlab = "")
+hist(sim.es[which(com_jac_sub[lcc_sub]==ncoms[4]), which(com_jac_sub[lcc_sub]==ncoms[4])], main=paste("C4 tamaño",table(com_jac_sub[lcc_sub])[4]), xlab = "")
+hist(sim.es[which(com_jac_sub[lcc_sub]==ncoms[5]), which(com_jac_sub[lcc_sub]==ncoms[5])], main=paste("C5 tamaño",table(com_jac_sub[lcc_sub])[5]), xlab = "")
+hist(sim.es[which(com_jac_sub[lcc_sub]==ncoms[6]), which(com_jac_sub[lcc_sub]==ncoms[6])], main=paste("C6 tamaño",table(com_jac_sub[lcc_sub])[6]), xlab = "")
 
 
 
