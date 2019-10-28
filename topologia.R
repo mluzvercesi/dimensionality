@@ -98,13 +98,9 @@ names(celltypes) <- names(com_jac)
 celltypes_sub <- as.character(metadata[names(com_jac_sub),"cell_type"])
 names(celltypes_sub) <- names(com_jac_sub)
 
-
-celltypes_nro <- rep(0, length(celltypes))
+celltypes_nro <- as.numeric(factor(celltypes_copia))
 names(celltypes_nro) <- names(celltypes)
-for (i in 1:length(unique(celltypes))){
-  celltypes_nro[celltypes==unique(celltypes)[i]] <- i
-}
-rm(i)
+
 
 # Indice Rand
 indice.rand(com_jac, celltypes_nro)
@@ -127,44 +123,86 @@ assortativity_nominal(knn.jac_sub, types=celltypes_nro[names(com_jac_sub)], dire
 
 # Asortatividad vectorial por comunidad
 ncoms <- unique(com_jac_sub[lcc_sub])
-mean_es <- matrix(0,ncol=length(ncoms), nrow=dim(cells.es)[1])
-median_es <- matrix(0,ncol=length(ncoms), nrow=dim(cells.es)[1])
-rownames(mean_es) <- rownames(cells.es)
+
+#Hipotesis nula: comparo con el azar cambiando el orden de las columnas
+r <- matrix(0, nrow = 2, ncol = length(ncoms))
+colnames(r) <- names(table(com_jac_sub[lcc_sub]))
+rownames(r) <- c("size","r")
+r[1,] <- table(com_jac_sub[lcc_sub])
 
 for (i in 1:length(ncoms)){
   nombres <- which(com_jac_sub[lcc_sub]==ncoms[i])
-  tamanio <- table(com_jac_sub[lcc_sub])[i]
-  
-  #mean_es[,i] <- apply(cells.es[,nombres],1,mean)
-  #median_es[,i] <- apply(cells.es[,nombres],1,median)
-  
   red <- induced_subgraph(knn_sub, nombres)
-  r <- assortativity_vect(red, sim.es[nombres,nombres])
-  cat("Comunidad:", ncoms[i], "- Tamaño:", tamanio, "- Asortatividad: ",r,"\n")
+  r[2,i] <- assortativity_vect(red, sim.es[nombres,nombres])
 }
 
-for (i in 1:length(unique(celltypes))){
-  nombres <- which(celltypes[lcc_sub]==unique(celltypes)[i])
-  tamanio <- table(celltypes[lcc_sub])[i]
-  
+r_ct <- matrix(0, nrow = 2, ncol = length(unique(celltypes_sub)))
+colnames(r_ct) <- names(table(celltypes_sub[lcc_sub]))
+rownames(r_ct) <- c("size","r")
+r_ct[1,] <- table(celltypes_sub[lcc_sub])
+
+for (i in 1:length(unique(celltypes_sub))){
+  nombres <- which(celltypes_sub[lcc_sub]==unique(celltypes_sub)[i])
   red <- induced_subgraph(knn_sub, nombres)
-  r <- assortativity_vect(red, sim.es[nombres,nombres])
-  cat("Comunidad:", unique(celltypes)[i], "- Tamaño:", tamanio, "- Asortatividad: ",r,"\n")
+  r_ct[2,i] <- assortativity_vect(red, sim.es[nombres,nombres])
 }
+ra <- 0
+for (j in 1:N){
+  azar <- cells.es[,sample(ncol(cells.es))]
+  colnames(azar) <- colnames(cells.es)
+  sim.es_azar <- cos_sim(azar)
+  ra <- ra + assortativity_vect(knn_sub, sim.es_azar)
+}
+ra <- ra/N #es casi lo mismo usar la red completa que las comunidades
 
 
 # silhouette
+library(cluster)
 sil <- silhouette(com_jac_sub, dmatrix = 1-sim.es, full=TRUE)
 x11()
 plot(sil)
 
 
 #distribucion (histograma) de similitud entre pares, por comunidad
+pares <- as.dist(sim.es, diag = FALSE, upper = FALSE)
+com_ind <- c(1, 4, 5, 6)
 par(mfrow=c(2,2))
-hist(sim.es[which(com_jac_sub[lcc_sub]==ncoms[1]), which(com_jac_sub[lcc_sub]==ncoms[1])], main=paste("C1 tamaño",table(com_jac_sub[lcc_sub])[1]), xlab = "")
-hist(sim.es[which(com_jac_sub[lcc_sub]==ncoms[4]), which(com_jac_sub[lcc_sub]==ncoms[4])], main=paste("C4 tamaño",table(com_jac_sub[lcc_sub])[4]), xlab = "")
-hist(sim.es[which(com_jac_sub[lcc_sub]==ncoms[5]), which(com_jac_sub[lcc_sub]==ncoms[5])], main=paste("C5 tamaño",table(com_jac_sub[lcc_sub])[5]), xlab = "")
-hist(sim.es[which(com_jac_sub[lcc_sub]==ncoms[6]), which(com_jac_sub[lcc_sub]==ncoms[6])], main=paste("C6 tamaño",table(com_jac_sub[lcc_sub])[6]), xlab = "")
+for (i in 1:length(com_ind)){
+  cuales <- which(com_jac_sub[lcc_sub]==ncoms[com_ind[i]])
+  X <- sim.es[cuales, cuales]
+  diag(X) <- NaN
+  hist(as.dist(X, diag = FALSE, upper = FALSE), freq=FALSE,
+       main=paste("C",ncoms[com_ind[i]],"tamaño",table(com_jac_sub[lcc_sub])[com_ind[i]]), xlab = "")
+  
+  A <- matrix(0, nrow = N, ncol = (length(X)-dim(X)[1])/2)
+  for (j in 1:dim(A)[1]){
+    A[j,] <- sample(pares, (length(X)-dim(X)[1])/2)
+  }
+  hist(A, freq=FALSE, col=rgb(1,0,0,0.5), add=TRUE)
+}
+
+
+#Centralidad de los enlaces
+kcoreness <- coreness(knn_sub_lcc)
+enlaces <- as_edgelist(knn_sub_lcc, names = TRUE)
+enlaces_k <- enlaces
+enlaces_k[,1] <- kcoreness[enlaces[,1]]
+enlaces_k[,2] <- kcoreness[enlaces[,2]]
+enlaces_k <- matrix(as.integer(enlaces_k), nrow=dim(enlaces_k)[1], ncol=dim(enlaces_k)[2])
+
+edge_core <- apply(enlaces_k, 1, min)
+edge_sim <- apply(enlaces, 1, function(x){ sim.es[x[1], x[2]] })
+
+mean_edge_sim <- rep(0, length(unique(edge_core)))
+for (i in 1:length(unique(edge_core))){
+  mean_edge_sim[i] <- edge_sim[edge_core=unique(edge_core)[i]]
+}
+
+plot(edge_core, edge_sim)
+points(unique(edge_core),mean_edge_sim,col="green")
+
+g <- graph_from_edgelist(enlaces[edge_core==max(edge_core),], directed = FALSE)
+is.connected(g)
 
 
 
@@ -205,8 +243,8 @@ vecinos <- adjacent_vertices(knn, com_jac %in% single_com)
 vecinos[as.numeric(lapply(vecinos,length))>0]
 
 #para participacion y z-score (calculate_toproles.R)
-membership <- com_jac
-g_users <- knn
+membership <- com_jac_sub[lcc_sub]
+g_users <- knn_sub_lcc
 
 #------------------------------------------------------------------------
 #Comparacion rapida: grafo knn vs similarity pval

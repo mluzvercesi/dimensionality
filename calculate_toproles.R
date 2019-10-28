@@ -20,7 +20,7 @@ z_i[which(is.nan(z_i))] = 0 #Los que tenian varianza cero por ser todos identico
 modu_map = matrix(nrow=length(unique(membership)), ncol=length(V(g_users)))
 modu_map[,] = 0 #Seteo default todo a cero.
 for(i in 1:length(V(g_users))){
-    modu_map[membership[i],i] = 1 #Senalo a que modulo pertenece el nodo i.
+    modu_map[unique(membership)==membership[i],i] = 1 #Senalo a que modulo pertenece el nodo i.
 }
 module_links = modu_map %*% adyacencia #Si mapeo la adyacencia por los modulos tengo la cantidad de links del nodo i a cada modulo.
 

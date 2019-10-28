@@ -2,6 +2,19 @@
 # save(object1,object2,file="~/Documents/dimensionality/results/myworkspace.RData")
 # require("package") or "package" %in% rownames(installed.packages())
 
+# FUNCIONES
+#norm_vect (x)
+#indice.rand (group1, group2)
+#cos_sim (x)
+#computarIC (OrgDb, keytype = "ENTREZID", ont)
+#mean_logbin (y,x)
+#pca_svd (X,L)
+#genes_by_weight (results,ncomp=1,retw=FALSE)
+#sym2eg (genes,inverse=FALSE)
+#eg2go function(genes_id)
+#genesinbp (genes_id,GOBPid)
+
+#------------------------------------------------------------------------
 norm_vect <- function(x) {sqrt(sum(x^2))}
 #------------------------------------------------------------------------
 indice.rand <- function (group1, group2){
