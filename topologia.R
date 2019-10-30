@@ -2,19 +2,6 @@ library(igraph)
 library(hbm) #para clustering MCL
 
 #------------------------------------------------------------------------
-# Similitud GSEA
-load("~/Documents/dimensionality/results/fgseaA_res.RData") # cells.es, cells.nes, cells.padj, cells.pval, asort
-# asort es la tabla de valores de asortatividad calculado con todas las distintas medidas
-
-logp <- -log(cells.padj)
-sim.log <- cos_sim(logp)
-cor.log <- cor(logp)
-
-sim.es <- cos_sim(cells.es) 
-
-# NOTA: Hay NaN en los resultados de NES, 42 valores en 9 celulas (obs: en cada uno de ellos, pval=1). ??
-# NES: enrichment score normalized to mean enrichment of random samples of the same size
-#------------------------------------------------------------------------
 # Topologia
 # Primero armo el grafo knn
 # Cell connected to its K (5-100) most similar cells, obtained using Euclidean distances on the PC-reduced expression space
@@ -120,33 +107,52 @@ assortativity_nominal(knn.jac_sub, types=com_jac_sub, directed=FALSE)
 assortativity_nominal(knn.jac, types=celltypes_nro, directed=FALSE)
 assortativity_nominal(knn.jac_sub, types=celltypes_nro[names(com_jac_sub)], directed=FALSE)
 
+#------------------------------------------------------------------------
+# Similitud GSEA
+load("~/Documents/dimensionality/results/fgseaA_res.RData") # cells.es, cells.nes, cells.padj, cells.pval, asort
+# asort es la tabla de valores de asortatividad calculado con todas las distintas medidas
+
+logp <- -log(cells.padj)
+
+# NOTA: Hay NaN en los resultados de NES, 42 valores en 9 celulas (obs: en cada uno de ellos, pval=1). ??
+# NES: enrichment score normalized to mean enrichment of random samples of the same size
+nes <- cells.nes[,!is.nan(apply(cells.nes, 2, min))] #tiro las celulas problematicas
+
+sim.es <- cos_sim(cells.es)
+
+# OJO! Puede que muchas cosas den similares porque se parecen en que ninguna de las dos esta enriquecida en cierta GO
+# Ver: hist(as.dist(sim.es, diag = FALSE, upper = FALSE))
+
+es0 <- ifelse(cells.es < 0, 0, cells.es)
+nes0 <- ifelse(nes < 0, 0, nes)
+
+
+
+# Filtrar ES y NES por padj: tomo -log y me fijo los significativos
+hist(-log(cells.padj[upper.tri(cells.padj)][i]))
+abline(v=-log(0.05))
+
+
 
 # Asortatividad vectorial por comunidad
 ncoms <- unique(com_jac_sub[lcc_sub])
 
 #Hipotesis nula: comparo con el azar cambiando el orden de las columnas
-r <- matrix(0, nrow = 2, ncol = length(ncoms))
-colnames(r) <- names(table(com_jac_sub[lcc_sub]))
-rownames(r) <- c("size","r")
-r[1,] <- table(com_jac_sub[lcc_sub])
-
 for (i in 1:length(ncoms)){
   nombres <- which(com_jac_sub[lcc_sub]==ncoms[i])
   red <- induced_subgraph(knn_sub, nombres)
-  r[2,i] <- assortativity_vect(red, sim.es[nombres,nombres])
+  r <- assortativity_vect(red, sim.es[nombres,nombres])
+  cat("r = ", r, "Comunidad", ncoms[i], "tamaño", table(com_jac_sub[lcc_sub])[i], "\n")
 }
-
-r_ct <- matrix(0, nrow = 2, ncol = length(unique(celltypes_sub)))
-colnames(r_ct) <- names(table(celltypes_sub[lcc_sub]))
-rownames(r_ct) <- c("size","r")
-r_ct[1,] <- table(celltypes_sub[lcc_sub])
 
 for (i in 1:length(unique(celltypes_sub))){
   nombres <- which(celltypes_sub[lcc_sub]==unique(celltypes_sub)[i])
   red <- induced_subgraph(knn_sub, nombres)
-  r_ct[2,i] <- assortativity_vect(red, sim.es[nombres,nombres])
+  r <- assortativity_vect(red, sim.es[nombres,nombres])
+  cat("r = ", r, "Comunidad", unique(celltypes_sub)[i], "tamaño", table(celltypes_sub[lcc_sub])[i],"\n")
 }
 ra <- 0
+N <- 100
 for (j in 1:N){
   azar <- cells.es[,sample(ncol(cells.es))]
   colnames(azar) <- colnames(cells.es)
@@ -154,6 +160,7 @@ for (j in 1:N){
   ra <- ra + assortativity_vect(knn_sub, sim.es_azar)
 }
 ra <- ra/N #es casi lo mismo usar la red completa que las comunidades
+cat("r azar = ",r)
 
 
 # silhouette
@@ -198,12 +205,23 @@ for (i in 1:length(unique(edge_core))){
   mean_edge_sim[i] <- edge_sim[edge_core=unique(edge_core)[i]]
 }
 
+par(mfrow=c(1,1))
 plot(edge_core, edge_sim)
-points(unique(edge_core),mean_edge_sim,col="green")
+points(unique(edge_core), mean_edge_sim, col="green", pch=16)
 
-g <- graph_from_edgelist(enlaces[edge_core==max(edge_core),], directed = FALSE)
+corelist <- sort(unique(edge_core), decreasing = TRUE)
+
+g <- graph_from_edgelist(enlaces[edge_core>corelist[7],], directed = FALSE)
 is.connected(g)
+alphavec <- kcoreness[V(g)]/max(kcoreness[V(g)])
+plot.igraph(g, vertex.label=NA, vertex.size=5, edge.width=0.5,
+            vertex.color = rgb(0,1,0,alphavec))
 
+# participacion vs coreness de cada nodo
+g_users <- knn_sub_lcc
+membership <- com_jac_sub[lcc_sub]
+#usar calculate_toproles.R
+plot(kcoreness, p_i)
 
 
 contingencia <- table(com_jac,celltypes)

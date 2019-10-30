@@ -4,8 +4,9 @@
 
 # FUNCIONES
 #norm_vect (x)
-#indice.rand (group1, group2)
+#assortativity_vect (network, X)
 #cos_sim (x)
+#indice.rand (group1, group2)
 #computarIC (OrgDb, keytype = "ENTREZID", ont)
 #mean_logbin (y,x)
 #pca_svd (X,L)
@@ -16,6 +17,42 @@
 
 #------------------------------------------------------------------------
 norm_vect <- function(x) {sqrt(sum(x^2))}
+#------------------------------------------------------------------------
+assortativity_vect <- function(network, X){
+  # network puede ser la red o la matriz de adyacencia
+  # X matriz de similitud o correlacion entre propiedades vectoriales de los nodos
+  # devuelve el coeficiente de asortatividad
+  
+  if (is.igraph(network)){ # si tengo grafo, armo matriz de adyacencia
+    A <- as.matrix(as_adjacency_matrix(network))
+  }else if (is.matrix(network)){
+    A <- network
+  }else{stop("No es una red")}
+  
+  diag(A) <- 0 # sin auto enlaces
+  m <-  sum(A)/2 # enlaces totales
+  
+  if (m==0){
+    r<-0
+  }else{
+    r <- sum(diag(A %*% X)) / (2*m)
+  }
+  
+  # si X es un vector, es decir la propiedad es escalar:
+  #  media <- sum(A %*% X)/sum(A)
+  #  r <- ((X-media) %*% A %*% (X-media))/sum(A%*% (X-media)^2)
+  return(r)
+}
+#------------------------------------------------------------------------
+cos_sim <- function(x){
+  # calcula matriz de similarity entre columnas de matriz x
+  y <- colSums(x^2)
+  coseno <- (t(x) %*% x) / (sqrt( y %*% t(y) ))
+  nombres <- colnames(x)
+  colnames(coseno) <- nombres
+  rownames(coseno) <- nombres
+  return(coseno)
+}
 #------------------------------------------------------------------------
 indice.rand <- function (group1, group2){
   # Devuelve:
@@ -38,16 +75,6 @@ indice.rand <- function (group1, group2){
   }else{
     print("Los grupos son diferentes")
   }
-}
-#------------------------------------------------------------------------
-cos_sim <- function(x){
-  # calcula matriz de similarity entre columnas de matriz x
-  y <- colSums(x^2)
-  coseno <- (t(x) %*% x) / (sqrt( y %*% t(y) ))
-  nombres <- colnames(x)
-  colnames(coseno) <- nombres
-  rownames(coseno) <- nombres
-  return(coseno)
 }
 #------------------------------------------------------------------------
 ##' @importFrom AnnotationDbi as.list
