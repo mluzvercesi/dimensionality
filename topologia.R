@@ -129,13 +129,35 @@ nes0 <- ifelse(nes < 0, 0, nes)
 
 
 # Filtrar ES y NES por padj: tomo -log y me fijo los significativos
-hist(-log(cells.padj[upper.tri(cells.padj)][i]))
+hist(-log(cells.padj[upper.tri(cells.padj)]))
 abline(v=-log(0.05))
 
 
 
 # Asortatividad vectorial por comunidad
 ncoms <- unique(com_jac_sub[lcc_sub])
+
+#prueba------
+matriz <- cos_sim(cells.es)
+a <- ifelse(cells.pval<0.05, cells.es, 0)
+a <- ifelse(a>0, a, 0)
+matriz <- cos_sim(a)
+
+
+for (i in 1:length(ncoms)){
+  nombres <- which(com_jac_sub[lcc_sub]==ncoms[i])
+  red <- induced_subgraph(knn_sub, nombres)
+  r <- assortativity_vect(red, matriz[nombres,nombres])
+  cat("r = ", r, "Comunidad", ncoms[i], "tamaño", table(com_jac_sub[lcc_sub])[i], "\n")
+}
+
+for (i in 1:length(unique(celltypes_sub))){
+  nombres <- which(celltypes_sub[lcc_sub]==unique(celltypes_sub)[i])
+  red <- induced_subgraph(knn_sub, nombres)
+  r <- assortativity_vect(red, matriz[nombres,nombres])
+  cat("r = ", r, "Comunidad", unique(celltypes_sub)[i], "tamaño", table(celltypes_sub[lcc_sub])[i],"\n")
+}
+#----
 
 #Hipotesis nula: comparo con el azar cambiando el orden de las columnas
 for (i in 1:length(ncoms)){

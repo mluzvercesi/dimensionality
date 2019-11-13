@@ -2,22 +2,9 @@
 # save(object1,object2,file="~/Documents/dimensionality/results/myworkspace.RData")
 # require("package") or "package" %in% rownames(installed.packages())
 
-# FUNCIONES
-#norm_vect (x)
-#assortativity_vect (network, X)
-#cos_sim (x)
-#indice.rand (group1, group2)
-#computarIC (OrgDb, keytype = "ENTREZID", ont)
-#mean_logbin (y,x)
-#pca_svd (X,L)
-#genes_by_weight (results,ncomp=1,retw=FALSE)
-#sym2eg (genes,inverse=FALSE)
-#eg2go function(genes_id)
-#genesinbp (genes_id,GOBPid)
-
 #------------------------------------------------------------------------
 norm_vect <- function(x) {sqrt(sum(x^2))}
-#------------------------------------------------------------------------
+
 assortativity_vect <- function(network, X){
   # network puede ser la red o la matriz de adyacencia
   # X matriz de similitud o correlacion entre propiedades vectoriales de los nodos
@@ -43,17 +30,18 @@ assortativity_vect <- function(network, X){
   #  r <- ((X-media) %*% A %*% (X-media))/sum(A%*% (X-media)^2)
   return(r)
 }
-#------------------------------------------------------------------------
+
 cos_sim <- function(x){
   # calcula matriz de similarity entre columnas de matriz x
   y <- colSums(x^2)
   coseno <- (t(x) %*% x) / (sqrt( y %*% t(y) ))
+  coseno[is.nan(coseno)] <- 0
   nombres <- colnames(x)
   colnames(coseno) <- nombres
   rownames(coseno) <- nombres
   return(coseno)
 }
-#------------------------------------------------------------------------
+
 indice.rand <- function (group1, group2){
   # Devuelve:
   # r = indice Rand
@@ -76,7 +64,94 @@ indice.rand <- function (group1, group2){
     print("Los grupos son diferentes")
   }
 }
-#------------------------------------------------------------------------
+mean_logbin <- function(y,x){
+  # Valores medios de y con bineado logaritmico, con limites de x
+  bins <- seq(log(min(x[x>0])),log(max(x)), length=100)
+  bins <- exp(bins)
+  bins <- c(0,bins)
+  histo <- hist(x, breaks = bins, plot=FALSE)
+  
+  centros <- rep(0, length(bins)-1)
+  y_mean <- rep(0, length(centros))
+  # centros de bins
+  for (i in 1:length(centros)){
+    centros[i] <- (bins[i+1]+bins[i])/2
+  }
+  # calculo los valores medios en estos bins
+  y_order <- y[order(x)]
+  k1 <- 1
+  k2 <- 0
+  for (i in 1:length(y_mean)){
+    c <- histo$counts[i]
+    if (c==0){
+      y_mean[i] <- NaN
+    }
+    else{
+      k2 <- k2 + c
+      y_mean[i] <- sum(y_order[k1:k2])/c
+      k1 <- k1 + c
+    }
+  }
+  result <- list('x'=centros,'y'=y_mean)
+  return(result)
+}
+
+pca_svd <- function(X,L=NULL){
+  # Funcion para encontrar los L primeros componentes principales de X usando SVD
+  # Devuelve desvios standard (raiz de autovalores de t(X)*X) y componentes principales (autovect)
+  
+  # PARA SC-EXP: que X sea la matriz transpuesta (filas:celulas, columnas:genes)
+  
+  X <- apply(X,2,function(x){x-mean(x)}) # columnas centradas en 0
+  M <- dim(X)[1] # cantidad de filas (celulas)
+  N <- dim(X)[2] # cantidad de columnas (genes)
+  
+  # cantidad de componentes principales: minimo entre lados de la matriz y L
+  if (is.null(L)){
+    k <- min(N,M)
+  }else{
+    k <- min(N,M,L)
+  }
+  
+  # Singular value decomposition de la matriz
+  d_u_v <- svd(X)
+  d <- d_u_v$d # vector de singular values (sigmas)
+  u <- d_u_v$u # matriz de MxM cuyas columnas son lsv (autovect de X*Xt)
+  v <- d_u_v$v # matriz de NxN cuyas columnas son rsv (autovect de Xt*X)
+  
+  # Devuelve vector de desvios standard, la matriz v cuyas columnas son PCs y
+  # matriz cuyas columnas son las nuevas mediciones rotadas
+  result <- list('sdev'=d_u_v$d[1:k],'rotation'=d_u_v$v[,1:k],'x'=d_u_v$u[,1:k])
+  return(result)
+}
+
+genes_by_weight <- function(results,ncomp=1,retw=FALSE){ 
+  # Devuelve una lista ordenada de nombres de genes segun su peso sobre los componentes principales ncomp de X
+  # Si retw = TRUE devuelve el peso ("importancia") de cada gen
+  # Necesita matriz de scexp (X) y resultado de pca_svd o de prcomp (results)
+  p <- results$rotation[,ncomp]
+  lambdas <- (results$sdev)^2
+  w <- lambdas[ncomp]/sum(lambdas)
+  if (is.null(dim(p))){ # si solo hay un componente principal
+    p <- p*w
+    weights <- abs(p)
+  }else{ # si hay mas de uno, es matriz
+    p <- apply(p,1,function(x){x*w})
+    weights <- apply(p,2,function(x){sum(abs(x))})
+  }
+  weights <- weights/sum(weights)
+  # los pesos pueden variar entre prcomp y pca_svd, pero el orden es el mismo
+  
+  indices <- order(weights,decreasing = TRUE) # orden de maximas proyecciones
+  
+  if (retw){
+    nombre <- list("genes"=rownames(results$rotation)[indices],"weights"=weights[indices])
+  }else{
+    nombre <- rownames(results$rotation)[indices]
+  }
+  return(nombre)
+}
+
 ##' @importFrom AnnotationDbi as.list
 ##' @importFrom GO.db GOBPOFFSPRING
 # fuente: GOSemSim https://rdrr.io/bioc/GOSemSim/src/R/computeIC.R
@@ -128,99 +203,7 @@ computarIC <- function(OrgDb, keytype = "ENTREZID", ont) {
   return(IC)
 }
 
-#------------------------------------------------------------------------
-mean_logbin <- function(y,x){
-  # Valores medios de y con bineado logaritmico, con limites de x
-  bins <- seq(log(min(x[x>0])),log(max(x)), length=100)
-  bins <- exp(bins)
-  bins <- c(0,bins)
-  histo <- hist(x, breaks = bins, plot=FALSE)
-  
-  centros <- rep(0, length(bins)-1)
-  y_mean <- rep(0, length(centros))
-  # centros de bins
-  for (i in 1:length(centros)){
-    centros[i] <- (bins[i+1]+bins[i])/2
-  }
-  # calculo los valores medios en estos bins
-  y_order <- y[order(x)]
-  k1 <- 1
-  k2 <- 0
-  for (i in 1:length(y_mean)){
-    c <- histo$counts[i]
-    if (c==0){
-      y_mean[i] <- NaN
-    }
-    else{
-      k2 <- k2 + c
-      y_mean[i] <- sum(y_order[k1:k2])/c
-      k1 <- k1 + c
-    }
-  }
-  result <- list('x'=centros,'y'=y_mean)
-  return(result)
-}
-
-#------------------------------------------------------------------------
-pca_svd <- function(X,L=NULL){
-  # Funcion para encontrar los L primeros componentes principales de X usando SVD
-  # Devuelve desvios standard (raiz de autovalores de t(X)*X) y componentes principales (autovect)
-  
-  # PARA SC-EXP: que X sea la matriz transpuesta (filas:celulas, columnas:genes)
-  
-  X <- apply(X,2,function(x){x-mean(x)}) # columnas centradas en 0
-  M <- dim(X)[1] # cantidad de filas (celulas)
-  N <- dim(X)[2] # cantidad de columnas (genes)
-  
-  # cantidad de componentes principales: minimo entre lados de la matriz y L
-  if (is.null(L)){
-    k <- min(N,M)
-  }else{
-    k <- min(N,M,L)
-  }
-  
-  # Singular value decomposition de la matriz
-  d_u_v <- svd(X)
-  d <- d_u_v$d # vector de singular values (sigmas)
-  u <- d_u_v$u # matriz de MxM cuyas columnas son lsv (autovect de X*Xt)
-  v <- d_u_v$v # matriz de NxN cuyas columnas son rsv (autovect de Xt*X)
-  
-  # Devuelve vector de desvios standard, la matriz v cuyas columnas son PCs y
-  # matriz cuyas columnas son las nuevas mediciones rotadas
-  result <- list('sdev'=d_u_v$d[1:k],'rotation'=d_u_v$v[,1:k],'x'=d_u_v$u[,1:k])
-  return(result)
-}
-
-#------------------------------------------------------------------------
-genes_by_weight <- function(results,ncomp=1,retw=FALSE){ 
-  # Devuelve una lista ordenada de nombres de genes segun su peso sobre los componentes principales ncomp de X
-  # Si retw = TRUE devuelve el peso ("importancia") de cada gen
-  # Necesita matriz de scexp (X) y resultado de pca_svd o de prcomp (results)
-  p <- results$rotation[,ncomp]
-  lambdas <- (results$sdev)^2
-  w <- lambdas[ncomp]/sum(lambdas)
-  if (is.null(dim(p))){ # si solo hay un componente principal
-    p <- p*w
-    weights <- abs(p)
-  }else{ # si hay mas de uno, es matriz
-    p <- apply(p,1,function(x){x*w})
-    weights <- apply(p,2,function(x){sum(abs(x))})
-  }
-  weights <- weights/sum(weights)
-  # los pesos pueden variar entre prcomp y pca_svd, pero el orden es el mismo
-  
-  indices <- order(weights,decreasing = TRUE) # orden de maximas proyecciones
-  
-  if (retw){
-		nombre <- list("genes"=rownames(results$rotation)[indices],"weights"=weights[indices])
-	}else{
-	  nombre <- rownames(results$rotation)[indices]
-	}
-  return(nombre)
-}
-
-#------------------------------------------------------------------------
-# FUNCIONES PARA GO
+#Func para GO------------------------------------------------------------
 sym2eg <- function(genes,inverse=FALSE){
   # Toma una lista de genes como simbolos (nombres) y devuelve sus egIDs, o viceversa
   # mapIds va de key a columna
@@ -257,7 +240,7 @@ genesinbp <- function(genes_id,GOBPid){
 }
 
 
-#------------------------------------------------------------------------
+#Fuera de uso------------------------------------------------------------
 # pca_1c <- function(X,tol=0.001){
 #   # Funcion para encontrar el primer componente principal de X
 #   # Devuelve el maximo autovalor y su autovector (comp principal)
@@ -314,8 +297,7 @@ genesinbp <- function(genes_id,GOBPid){
 #   return(result)
 # }
 
-#------------------------------------------------------------------------
-#FUNCIONES PARA PROBAR---------------------------------------------------
+# PARA PROBAR------------------------------------------------------------
 # pca_forzado <- function(X,nombre){
 #   # Funcion que permite forzar un gen "nombre" a aparecer en PCA como PC
 #   # Devuelve las componentes principales como columnas de la matriz pcs y la lista de genes importantes
@@ -346,7 +328,6 @@ genesinbp <- function(genes_id,GOBPid){
 #   return(nombre)
 # }
 
-# #------------------------------------------------------------------------
 # pca_svd_zeros <- function(X,L=NULL){
 #   # Funcion para encontrar los L primeros componentes principales de X usando SVD
 #   # Devuelve desvios standard (raiz de autovalores de t(X)*X) y componentes principales (autovect)
