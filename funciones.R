@@ -14,7 +14,7 @@ assortativity_vect <- function(network, X){
     A <- as.matrix(as_adjacency_matrix(network))
   }else if (is.matrix(network)){
     A <- network
-  }else{stop("No es una red")}
+  }else{stop("No se reconoce como red")}
   
   diag(A) <- 0 # sin auto enlaces
   m <-  sum(A)/2 # enlaces totales

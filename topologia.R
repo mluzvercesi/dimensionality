@@ -85,7 +85,7 @@ names(celltypes) <- names(com_jac)
 celltypes_sub <- as.character(metadata[names(com_jac_sub),"cell_type"])
 names(celltypes_sub) <- names(com_jac_sub)
 
-celltypes_nro <- as.numeric(factor(celltypes_copia))
+celltypes_nro <- as.numeric(factor(celltypes))
 names(celltypes_nro) <- names(celltypes)
 
 
@@ -117,21 +117,24 @@ logp <- -log(cells.padj)
 # NOTA: Hay NaN en los resultados de NES, 42 valores en 9 celulas (obs: en cada uno de ellos, pval=1). ??
 # NES: enrichment score normalized to mean enrichment of random samples of the same size
 nes <- cells.nes[,!is.nan(apply(cells.nes, 2, min))] #tiro las celulas problematicas
+es <- cells.es[,!is.nan(apply(cells.nes, 2, min))]
 
 sim.es <- cos_sim(cells.es)
 
 # OJO! Puede que muchas cosas den similares porque se parecen en que ninguna de las dos esta enriquecida en cierta GO
 # Ver: hist(as.dist(sim.es, diag = FALSE, upper = FALSE))
+# O: hist(sim.es[upper.tri(sim.es)])
 
+# Convertir en 0 los negativos de ES y NES (son los mismos en ambas)
 es0 <- ifelse(cells.es < 0, 0, cells.es)
 nes0 <- ifelse(nes < 0, 0, nes)
 
 
-
 # Filtrar ES y NES por padj: tomo -log y me fijo los significativos
-hist(-log(cells.padj[upper.tri(cells.padj)]))
-abline(v=-log(0.05))
-
+hist(-log(cells.padj))
+abline(v=-log(0.05), col="blue")
+abline(v=-log(0.1), col="green")
+abline(v=-log(0.15), col="red")
 
 
 # Asortatividad vectorial por comunidad
@@ -139,20 +142,22 @@ ncoms <- unique(com_jac_sub[lcc_sub])
 
 #prueba------
 matriz <- cos_sim(cells.es)
-a <- ifelse(cells.pval<0.05, cells.es, 0)
+a <- ifelse(cells.padj[,!is.nan(apply(cells.nes, 2, min))]<0.15, nes, 0)
 a <- ifelse(a>0, a, 0)
 matriz <- cos_sim(a)
 
 
 for (i in 1:length(ncoms)){
-  nombres <- which(com_jac_sub[lcc_sub]==ncoms[i])
+  nombres <- names(which(com_jac_sub[lcc_sub]==ncoms[i]))
+  nombres <- nombres[nombres %in% colnames(matriz)]
   red <- induced_subgraph(knn_sub, nombres)
   r <- assortativity_vect(red, matriz[nombres,nombres])
   cat("r = ", r, "Comunidad", ncoms[i], "tamaño", table(com_jac_sub[lcc_sub])[i], "\n")
 }
 
 for (i in 1:length(unique(celltypes_sub))){
-  nombres <- which(celltypes_sub[lcc_sub]==unique(celltypes_sub)[i])
+  nombres <- names(which(celltypes_sub[lcc_sub]==unique(celltypes_sub)[i]))
+  nombres <- nombres[nombres %in% colnames(matriz)]
   red <- induced_subgraph(knn_sub, nombres)
   r <- assortativity_vect(red, matriz[nombres,nombres])
   cat("r = ", r, "Comunidad", unique(celltypes_sub)[i], "tamaño", table(celltypes_sub[lcc_sub])[i],"\n")
