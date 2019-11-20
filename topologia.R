@@ -216,6 +216,11 @@ for (i in 1:length(com_ind)){
 }
 
 
+# atributo para enlaces: vecinos en comun
+enlaces <- as_edgelist(knn_sub_lcc, names = TRUE)
+frac_comun <- apply(enlaces, 1, function(x){vecinoscomun(knn_sub_lcc,x) })
+
+
 #Centralidad de los enlaces
 kcoreness <- coreness(knn_sub_lcc)
 enlaces <- as_edgelist(knn_sub_lcc, names = TRUE)

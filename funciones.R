@@ -5,6 +5,17 @@
 #------------------------------------------------------------------------
 norm_vect <- function(x) {sqrt(sum(x^2))}
 
+vecinoscomun <- function(g, par){
+  vec <- adjacent_vertices(g, v=par)
+  inter <- length(intersect(vec[[1]],vec[[2]]))
+  union <- length(union(vec[[1]],vec[[2]]))
+  if(union==0){
+    return(0)
+  }else{
+    return(inter/union)
+  }
+}
+
 assortativity_vect <- function(network, X){
   # network puede ser la red o la matriz de adyacencia
   # X matriz de similitud o correlacion entre propiedades vectoriales de los nodos
