@@ -34,12 +34,13 @@ if (sum(is.na(gene_universe_id))/length(gene_universe_id) > 0.1){
 
 hgCutoff <- 1 #usar cutoff 1 para que devuelva todos los pvalues
 
+nmax <- 10 #cantidad de pcs que considera
 hgs <- rep(NULL,8)
 
 start_time <- Sys.time()
-for (i in 1:10){
+for (i in 41:50){
   orderedgenes <- genes_by_weight(pca,ncomp=i)
-  selected_genes <- orderedgenes[1:100]
+  selected_genes <- orderedgenes[1:1000]
   selected_genes_id <- sym2eg(selected_genes)
   if (sum(is.na(selected_genes_id))/length(selected_genes_id)>0.1){
     cat(sprintf("Fraccion de genes sin mapear: %.2f", sum(is.na(selected_genes_id))/length(selected_genes_id)))
@@ -66,6 +67,7 @@ for (i in 1:10){
     
     if (dim(hg)[1]>0){ # agrego el PC solo si tiene elementos
       hg <- cbind(hg,rep(i,dim(hg)[1]))
+      names(hg)[8] <- "PC"
       hgs <- rbind(hgs,hg)
     }#end if size
   }#end if pvalue
@@ -73,7 +75,10 @@ for (i in 1:10){
 colnames(hgs)[8] <- "PC"
 end_time <- Sys.time()
 cat(sprintf("Tardó %.2f minutos\n", end_time-start_time))
+rm(i, hg, hyperg_df, index, hyperg_results, params, selected_genes_id, selected_genes, orderedgenes,end_time, start_time)
 
+#save(hgs,file="~/Documents/dimensionality/results/hgsAsub1000genes.RData")
+#load("~/Documents/dimensionality/results/hgsAsub1000genes.RData")
 #------------------------------------------------------------------------
 # REPRESENTACION VISUAL--------------------------------------------------
 load("~/Documents/dimensionality/results/Ahg.RData")
