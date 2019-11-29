@@ -34,13 +34,13 @@ if (sum(is.na(gene_universe_id))/length(gene_universe_id) > 0.1){
 
 hgCutoff <- 1 #usar cutoff 1 para que devuelva todos los pvalues
 
-nmax <- 10 #cantidad de pcs que considera
+nmax <- 100 #cantidad de pcs que considera
 hgs <- rep(NULL,8)
 
 start_time <- Sys.time()
-for (i in 41:50){
+for (i in 51:100){
   orderedgenes <- genes_by_weight(pca,ncomp=i)
-  selected_genes <- orderedgenes[1:1000]
+  selected_genes <- orderedgenes[1:500]
   selected_genes_id <- sym2eg(selected_genes)
   if (sum(is.na(selected_genes_id))/length(selected_genes_id)>0.1){
     cat(sprintf("Fraccion de genes sin mapear: %.2f", sum(is.na(selected_genes_id))/length(selected_genes_id)))
@@ -72,7 +72,7 @@ for (i in 41:50){
     }#end if size
   }#end if pvalue
 }#end loop i (pcs)
-colnames(hgs)[8] <- "PC"
+#colnames(hgs)[8] <- "PC"
 end_time <- Sys.time()
 cat(sprintf("Tardó %.2f minutos\n", end_time-start_time))
 rm(i, hg, hyperg_df, index, hyperg_results, params, selected_genes_id, selected_genes, orderedgenes,end_time, start_time)

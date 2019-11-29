@@ -8,7 +8,7 @@ library(hbm) #para clustering MCL
 
 load("~/Documents/dimensionality/results/Asubconjunto.RData")
 rm(pcaAsub_scaled, dataAsub)
-cells_pc <- pcaAsub$x[,1:10] # celulas (filas) representadas en los 10 primeros pcs
+cells_pc <- pcaAsub$x[,1:100] # celulas (filas) representadas en los 100 primeros pcs
 cor_cells <- cor(t(cells_pc))
 
 X <- cor_cells # se podria hacer con similarity en vez de correlacion pero da las mismas comunidades

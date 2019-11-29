@@ -11,6 +11,7 @@ X <- dataAsub
 N_gen  <- dim(X)[1]
 M_cell <- dim(X)[2]
 
+n0 <- as.matrix(apply(X,2,function(x){sum(x==0)}))/N_gen 
 #max0s <- c(0.92,0.88,0.95) # para los subconjuntos
 X_0 <- X[,(n0<0.92)] # Quedan solo las que no superen el umbral
 
@@ -45,9 +46,9 @@ lines(cv2mean$x, exp(y_cv2mean), col="green")
 pred_lin <- predict(fit_cv2mean, data.frame(x=mean_gen))
 filtro_gen <- (cv2>exp(pred_lin))
 
+X_1 <- X_0[filtro_gen,]
 rm(cv,cv2,cv2mean,filtro_gen,fit_cv2mean,mean_gen,mean_logbin,pred_lin,sdev_gen,x,y,y_cv2mean)
 
-X_1 <- X_0[filtro_gen,]
 N_gen  <- dim(X_1)[1]
 M_cell <- dim(X_1)[2]
 
@@ -64,7 +65,7 @@ rownames(Z) <- sym2eg(rownames(Z))
 # save(Z,gopcsA,file="~/Documents/dimensionality/results/gseaA.RData")
 load("~/Documents/dimensionality/results/gseaA.RData")
 
-gonames <- rownames(gopcsA)
+gonames <- rownames(gopcs)
 Ngo <- length(gonames)
 Ncells <- dim(Z)[2]
 go_list <- list() #lista (de goids) de listas (de genes en cada goid)
@@ -103,6 +104,7 @@ rm(i,p,dospor,zranks,gsea_res)
 end_time <- Sys.time()
 print(end_time-start_time)
 rm(start_time,end_time)
+save(cells.es, cells.nes, cells.pval, cells.padj, file="~/Documents/dimensionality/results/fgseaAsub100pcs500genes.RData")
 # 1.968373 hs, 1553 de 2932 con 10k permutaciones, el resto con 1k (res_mix.RData)
 
 #------------------------------------------------------------------------
