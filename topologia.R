@@ -1,5 +1,14 @@
 library(igraph)
-library(hbm) #para clustering MCL
+
+#library(hbm) # NO! para clustering MCL usar el software posta
+#com  <- mcl(jacc, infl = 1.25, iter = 300, verbose = TRUE)
+# A sub: 11 coms, maxsize=1089, 39 iteraciones, 4 coms de 1
+# A: 43 coms, maxsize=2743, 60 iteraciones, 15 coms de 1. NOTA: hay 19 coms con <5 nodos
+# I = 6,    2774 comunidades, max size = 7, 8 iteraciones
+# I = 2,    739 comunidades, max size= 37, 16 iteraciones
+# I = 1.6,  128 comunidades, max size= 95, 25 iteraciones, 13 coms de 1
+# I = 1.4,  50 comunidades, max size=283, 32 iteraciones, 8 coms de 1
+# I = 1.25, 19 comunidades, max size=691, 56 iteraciones, 7 coms de 1
 
 #------------------------------------------------------------------------
 # Topologia
@@ -30,46 +39,43 @@ ady <- (A+t(A))/2
 ady <- floor(ady) #matriz de adyacencia de k vecinos cercanos mutuos
 
 #los nodos estan en el mismo orden que en la matriz
-knn_sub <- graph_from_adjacency_matrix(ady, mode="undirected", diag = FALSE)
+knn <- graph_from_adjacency_matrix(ady, mode="undirected", diag = FALSE)
 
-jacc <- similarity(knn_sub, method = "jaccard")
-knn.jac_sub <-  graph_from_adjacency_matrix(jacc, mode="undirected", weighted = TRUE, diag = FALSE)
-com_jac_sub  <- mcl(jacc, infl = 1.25, iter = 300, verbose = TRUE)
-# A sub: 11 coms, maxsize=1089, 39 iteraciones, 4 coms de 1
-# A: 43 coms, maxsize=2743, 60 iteraciones, 15 coms de 1. NOTA: hay 19 coms con <5 nodos
+jaccmat <- similarity(knn, method = "jaccard")
+jaccgr <-  graph_from_adjacency_matrix(jaccmat, mode="undirected", weighted = TRUE, diag = FALSE)
 
-# I = 6,    2774 comunidades, max size = 7, 8 iteraciones
-# I = 2,    739 comunidades, max size= 37, 16 iteraciones
-# I = 1.6,  128 comunidades, max size= 95, 25 iteraciones, 13 coms de 1
-# I = 1.4,  50 comunidades, max size=283, 32 iteraciones, 8 coms de 1
-# I = 1.25, 19 comunidades, max size=691, 56 iteraciones, 7 coms de 1
 
-names(com_jac_sub) <- rownames(ady)
-nro_com <- unique(com_jac_sub)
+# MCL (Ojo: mcl indexa desde 0)
+df <- jaccgr
+outfile<- "tmp.txt"
 
-#corrijo los numeros de las comunidades para que queden en orden
-for (i in 1:length(nro_com)){
-  com_jac_sub[com_jac_sub==nro_com[i]] <- i
-}
-rm(i)
+cmd    <- paste("mcl - --abc -I 1.25 -o - >",outfile,sep="")
+pw     <- pipe(cmd,open="wb")
+write.graph(df,file=pw,format="ncol")
+close(pw)
 
+pr<-pipe(paste("cat ",outfile,sep=""),open="r")
+lines<-readLines(pr)
+comms<-strsplit(split="\t", lines)
+close(pr)
+
+names(comms)<-seq_along(comms) #comms es una lista (de comunidades) de listas (de genes)
+comms <- sapply(comms,function(x){as.numeric(x)+1}) #para que coincidan los indices empezando en 1
+a<-reverseSplit((comms))
+membMCL<-as.numeric(unlist(a))
+names(membMCL)<-names(a) #membMCL es un vector de genes con membership
+
+#----
 # me tengo que quedar con el largest connected component ahora o entre knn y jaccard. miro que coincidan:
-components(knn_sub)$csize
-components(knn.jac_sub)$csize
-table(com_jac_sub)
-which(components(knn.jac_sub)$membership>1)
-which(components(knn_sub)$membership>1)
-com_jac_sub[which(components(knn_sub)$membership>1)]
-
 components(knn)$csize
-components(knn.jac)$csize
-com_jac[components(knn)$membership %in% which(components(knn)$csize==1)]
+components(jaccgr)$csize
+table(membMCL)
 
 lcc <- components(knn.jac)$membership %in% which(components(knn.jac)$csize>1)
-lcc_sub <- components(knn.jac_sub)$membership %in% which(components(knn.jac_sub)$csize>1)
+lcc_sub <- components(jaccgr)$membership %in% which(components(jaccgr)$csize>1)
 
 knn_lcc <- induced_subgraph(knn, lcc, impl = "copy_and_delete")
-knn_sub_lcc <- induced_subgraph(knn_sub, lcc_sub, impl = "copy_and_delete")
+knn_lcc <- induced_subgraph(knn, lcc_sub, impl = "copy_and_delete")
 
 #------------------------------------------------------------------------
 load("~/Documents/dimensionality/results/A_knn40.RData") #tiene com_jac, com_jac_sub, knn, knn_sub, knn.jac, knn.jac_sub
@@ -82,8 +88,8 @@ rownames(metadata) <- paste0("X",rownames(metadata))
 celltypes <- as.character(metadata[names(com_jac),"cell_type"])
 names(celltypes) <- names(com_jac)
 
-celltypes_sub <- as.character(metadata[names(com_jac_sub),"cell_type"])
-names(celltypes_sub) <- names(com_jac_sub)
+celltypes_sub <- as.character(metadata[names(membMCL),"cell_type"])
+names(celltypes_sub) <- names(membMCL)
 
 celltypes_nro <- as.numeric(factor(celltypes))
 names(celltypes_nro) <- names(celltypes)
@@ -96,16 +102,16 @@ library(fossil)
 rand.index(com_jac, celltypes_nro)
 adj.rand.index(com_jac, celltypes_nro)
 
-rand.index(com_jac_sub, celltypes_nro[names(com_jac_sub)])
-adj.rand.index(com_jac_sub, as.numeric(factor(celltypes_nro[names(com_jac_sub)])))
+rand.index(membMCL, celltypes_nro[names(membMCL)])
+adj.rand.index(membMCL, as.numeric(factor(celltypes_nro[names(membMCL)])))
 
 
 # Asortatividad de etiquetas MCL y celltype
 assortativity_nominal(knn.jac, types=com_jac, directed=FALSE)
-assortativity_nominal(knn.jac_sub, types=com_jac_sub, directed=FALSE)
+assortativity_nominal(jaccgr, types=membMCL, directed=FALSE)
 
 assortativity_nominal(knn.jac, types=celltypes_nro, directed=FALSE)
-assortativity_nominal(knn.jac_sub, types=celltypes_nro[names(com_jac_sub)], directed=FALSE)
+assortativity_nominal(jaccgr, types=celltypes_nro[names(membMCL)], directed=FALSE)
 
 #------------------------------------------------------------------------
 # Similitud GSEA
@@ -138,7 +144,7 @@ abline(v=-log(0.15), col="red")
 
 
 # Asortatividad vectorial por comunidad
-ncoms <- unique(com_jac_sub[lcc_sub])
+ncoms <- unique(membMCL[lcc_sub])
 
 #prueba------
 matriz <- cos_sim(cells.es)
@@ -148,17 +154,17 @@ matriz <- cos_sim(a)
 
 
 for (i in 1:length(ncoms)){
-  nombres <- names(which(com_jac_sub[lcc_sub]==ncoms[i]))
+  nombres <- names(which(membMCL[lcc_sub]==ncoms[i]))
   nombres <- nombres[nombres %in% colnames(matriz)]
-  red <- induced_subgraph(knn_sub, nombres)
+  red <- induced_subgraph(knn, nombres)
   r <- assortativity_vect(red, matriz[nombres,nombres])
-  cat("r = ", r, "Comunidad", ncoms[i], "tamaño", table(com_jac_sub[lcc_sub])[i], "\n")
+  cat("r = ", r, "Comunidad", ncoms[i], "tamaño", table(membMCL[lcc_sub])[i], "\n")
 }
 
 for (i in 1:length(unique(celltypes_sub))){
   nombres <- names(which(celltypes_sub[lcc_sub]==unique(celltypes_sub)[i]))
   nombres <- nombres[nombres %in% colnames(matriz)]
-  red <- induced_subgraph(knn_sub, nombres)
+  red <- induced_subgraph(knn, nombres)
   r <- assortativity_vect(red, matriz[nombres,nombres])
   cat("r = ", r, "Comunidad", unique(celltypes_sub)[i], "tamaño", table(celltypes_sub[lcc_sub])[i],"\n")
 }
@@ -166,15 +172,15 @@ for (i in 1:length(unique(celltypes_sub))){
 
 #Hipotesis nula: comparo con el azar cambiando el orden de las columnas
 for (i in 1:length(ncoms)){
-  nombres <- which(com_jac_sub[lcc_sub]==ncoms[i])
-  red <- induced_subgraph(knn_sub, nombres)
+  nombres <- which(membMCL[lcc_sub]==ncoms[i])
+  red <- induced_subgraph(knn, nombres)
   r <- assortativity_vect(red, sim.es[nombres,nombres])
-  cat("r = ", r, "Comunidad", ncoms[i], "tamaño", table(com_jac_sub[lcc_sub])[i], "\n")
+  cat("r = ", r, "Comunidad", ncoms[i], "tamaño", table(membMCL[lcc_sub])[i], "\n")
 }
 
 for (i in 1:length(unique(celltypes_sub))){
   nombres <- which(celltypes_sub[lcc_sub]==unique(celltypes_sub)[i])
-  red <- induced_subgraph(knn_sub, nombres)
+  red <- induced_subgraph(knn, nombres)
   r <- assortativity_vect(red, sim.es[nombres,nombres])
   cat("r = ", r, "Comunidad", unique(celltypes_sub)[i], "tamaño", table(celltypes_sub[lcc_sub])[i],"\n")
 }
@@ -184,7 +190,7 @@ for (j in 1:N){
   azar <- cells.es[,sample(ncol(cells.es))]
   colnames(azar) <- colnames(cells.es)
   sim.es_azar <- cos_sim(azar)
-  ra <- ra + assortativity_vect(knn_sub, sim.es_azar)
+  ra <- ra + assortativity_vect(knn, sim.es_azar)
 }
 ra <- ra/N #es casi lo mismo usar la red completa que las comunidades
 cat("r azar = ",r)
@@ -192,7 +198,7 @@ cat("r azar = ",r)
 
 # silhouette
 library(cluster)
-sil <- silhouette(com_jac_sub, dmatrix = 1-sim.es, full=TRUE)
+sil <- silhouette(membMCL, dmatrix = 1-sim.es, full=TRUE)
 x11()
 plot(sil)
 
@@ -202,11 +208,11 @@ pares <- as.dist(sim.es, diag = FALSE, upper = FALSE)
 com_ind <- c(1, 4, 5, 6)
 par(mfrow=c(2,2))
 for (i in 1:length(com_ind)){
-  cuales <- which(com_jac_sub[lcc_sub]==ncoms[com_ind[i]])
+  cuales <- which(membMCL[lcc_sub]==ncoms[com_ind[i]])
   X <- sim.es[cuales, cuales]
   diag(X) <- NaN
   hist(as.dist(X, diag = FALSE, upper = FALSE), freq=FALSE,
-       main=paste("C",ncoms[com_ind[i]],"tamaño",table(com_jac_sub[lcc_sub])[com_ind[i]]), xlab = "")
+       main=paste("C",ncoms[com_ind[i]],"tamaño",table(membMCL[lcc_sub])[com_ind[i]]), xlab = "")
   
   A <- matrix(0, nrow = N, ncol = (length(X)-dim(X)[1])/2)
   for (j in 1:dim(A)[1]){
@@ -217,13 +223,13 @@ for (i in 1:length(com_ind)){
 
 
 # atributo para enlaces: vecinos en comun
-enlaces <- as_edgelist(knn_sub_lcc, names = TRUE)
-frac_comun <- apply(enlaces, 1, function(x){vecinoscomun(knn_sub_lcc,x) })
+enlaces <- as_edgelist(knn_lcc, names = TRUE)
+frac_comun <- apply(enlaces, 1, function(x){vecinoscomun(knn_lcc,x) })
 
 
 #Centralidad de los enlaces
-kcoreness <- coreness(knn_sub_lcc)
-enlaces <- as_edgelist(knn_sub_lcc, names = TRUE)
+kcoreness <- coreness(knn_lcc)
+enlaces <- as_edgelist(knn_lcc, names = TRUE)
 enlaces_k <- enlaces
 enlaces_k[,1] <- kcoreness[enlaces[,1]]
 enlaces_k[,2] <- kcoreness[enlaces[,2]]
@@ -250,8 +256,8 @@ plot.igraph(g, vertex.label=NA, vertex.size=5, edge.width=0.5,
             vertex.color = rgb(0,1,0,alphavec))
 
 # participacion vs coreness de cada nodo
-g_users <- knn_sub_lcc
-membership <- com_jac_sub[lcc_sub]
+g_users <- knn_lcc
+membership <- membMCL[lcc_sub]
 #usar calculate_toproles.R
 plot(kcoreness, p_i)
 
@@ -293,8 +299,8 @@ vecinos <- adjacent_vertices(knn, com_jac %in% single_com)
 vecinos[as.numeric(lapply(vecinos,length))>0]
 
 #para participacion y z-score (calculate_toproles.R)
-membership <- com_jac_sub[lcc_sub]
-g_users <- knn_sub_lcc
+membership <- membMCL[lcc_sub]
+g_users <- knn_lcc
 
 #------------------------------------------------------------------------
 #Comparacion rapida: grafo knn vs similarity pval

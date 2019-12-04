@@ -40,14 +40,8 @@ require(igraph)
 g<-graph_from_data_frame(toml,directed=FALSE)
 
 #MCL
-df <- g
-outfile<- "tmp.txt"
-
-df <- knn.jac_sub_100
-outfile<- "tmp1.txt"
-
 df <- knn.jac_sub
-outfile<- "tmp2.txt"
+outfile<- "tmp.txt"
 
 cmd    <- paste("mcl - --abc -I 1.25 -o - >",outfile,sep="")
 pw     <- pipe(cmd,open="wb")
@@ -56,14 +50,28 @@ close(pw)
 
 pr<-pipe(paste("cat ",outfile,sep=""),open="r")
 lines<-readLines(pr)
-comms_10<-strsplit(split="\t", lines)
+comms<-strsplit(split="\t", lines)
 close(pr)
 
 names(comms)<-seq_along(comms)
 a<-reverseSplit((comms))
 membMCL<-as.numeric(unlist(a))
 names(membMCL)<-names(a)
-table(samples[,"cell_type"],membMCL[samples[,"cell_id"]])
+table(samples[,"cell_type"],membMCL[samples[,"cell_id"]]) #samples seria mi metadata, pero no se para que sirve esta linea
+
+#Nota: la red tenía 2932 nodos, pero las comunidades tienen 2846. No se si elimina las comunidades de 1
+#Los nombres estan bien (llegan hasta 2931)
+
+#comms es una lista (de comunidades) de listas (de genes)
+#si quiero un vector de genes con nro de comunidades:
+comms_array <- rep(0L, length(unique(purrr::flatten(comms))))
+names(comms_array) <- sort(as.array(as.numeric(unique(purrr::flatten(comms)))))
+
+for(nm in names(comms)){
+  comms_array[comms[[nm]]] <- as.numeric(nm)
+}
+rm(nm)
+names(comms_array) <- as.numeric(names(comms_array))+1
 
 #----
 comunidades <- rep(0, length(com_jac_sub_100))
@@ -74,6 +82,8 @@ for (i in 1:length(comms_mias)){
 
 # Asortatividad vectorial por comunidad
 ncoms <- unique(comunidades[lcc_sub])
+comms_array[lcc_sub[as.numeric(names(comms_array))]]
+
 
 #prueba------
 matriz <- cos_sim(cells.es)
@@ -81,13 +91,46 @@ matriz <- cos_sim(cells.es)
 a <- ifelse(cells.padj[,!is.nan(apply(cells.nes, 2, min))]<0.15, nes, 0)
 a <- ifelse(a>0, a, 0)
 matriz <- cos_sim(a)
+commslcc <- comms_array[lcc_sub[as.numeric(names(comms_array))]] #vector de comunidades del lcc
 
-for (i in 1:length(ncoms)){
-  nombres <- names(which(comunidades[lcc_sub]==i))
-  nombres <- nombres[nombres %in% colnames(matriz)]
-  red <- induced_subgraph(knn_sub, nombres)
-  r <- assortativity_vect(red, matriz[nombres,nombres])
-  cat("r = ", r, "Comunidad", i, "tamaño", table(comunidades[lcc_sub])[i], "\n")
+for (i in 1:length(comms)){
+  v <- as.numeric(names(commslcc[commslcc==i]))
+  red <- induced_subgraph(knn_sub, v)
+  r <- assortativity_vect(red, matriz[v,v])
+  cat("r = ", r, "Comunidad", i, "tamaño", table(commslcc)[i], "\n")
 }
 
+#------
+#si quiero ponerle un filtro a knn
+thres <- (sort((jacc[upper.tri(jacc)])[jacc[upper.tri(jacc)]>0]))[round(0.82*length((jacc[upper.tri(jacc)])[jacc[upper.tri(jacc)]>0])):length((jacc[upper.tri(jacc)])[jacc[upper.tri(jacc)]>0])][1]
+jacc_thres <- ifelse(jacc>thres,jacc,0)
+knnjacsubthres <-  graph_from_adjacency_matrix(jacc_thres, mode="undirected", weighted = TRUE, diag = FALSE)
 
+#MCL
+df <- knnjacsubthres
+outfile<- "tmp1.txt"
+
+cmd    <- paste("mcl - --abc -I 1.25 -o - >",outfile,sep="")
+pw     <- pipe(cmd,open="wb")
+write.graph(df,file=pw,format="ncol")
+close(pw)
+
+pr<-pipe(paste("cat ",outfile,sep=""),open="r")
+lines<-readLines(pr)
+comms_thres<-strsplit(split="\t", lines)
+close(pr)
+
+names(comms_thres)<-seq_along(comms_thres)
+
+#comms es una lista (de comunidades) de listas (de genes)
+#si quiero un vector de genes con nro de comunidades:
+comms_thres_array <- rep(0L, length(unique(purrr::flatten(comms_thres))))
+names(comms_thres_array) <- sort(as.array(as.numeric(unique(purrr::flatten(comms_thres)))))
+
+for(nm in names(comms_thres)){
+  comms_thres_array[comms_thres[[nm]]] <- as.numeric(nm)
+}
+rm(nm)
+names(comms_thres_array) <- as.numeric(names(comms_thres_array))+1
+
+#----
