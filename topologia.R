@@ -11,8 +11,7 @@ library(Biobase)
 # I = 1.4,  50 comunidades, max size=283, 32 iteraciones, 8 coms de 1
 # I = 1.25, 19 comunidades, max size=691, 56 iteraciones, 7 coms de 1
 
-#------------------------------------------------------------------------
-# Topologia
+# Topologia----
 # Primero armo el grafo knn
 # Cell connected to its K (5-100) most similar cells, obtained using Euclidean distances on the PC-reduced expression space
 
@@ -35,8 +34,8 @@ colnames(A) <- colnames(X)
 for (i in 1:dim(X)[1]){
   A[i,ordenk[,i]] <- 1 #X[ordenk[,i],i]
 }
-rm(i)
 ady <- (A+t(A))/2
+rm(i, A)
 ady <- floor(ady) #matriz de adyacencia de k vecinos cercanos mutuos
 
 #los nodos estan en el mismo orden que en la matriz
@@ -67,11 +66,11 @@ a<-reverseSplit((comms))
 membMCL<-as.numeric(unlist(a))
 names(membMCL)<-names(a) #membMCL es un vector de genes con membership
 
+rm(df, outfile, cmd, a, lines, pr, pw)
 #----
 # me tengo que quedar con el largest connected component ahora o entre knn y jaccard. miro que coincidan:
 components(knn)$csize
 components(jaccgr)$csize
-table(membMCL)
 
 lcc <- components(knn)$membership %in% which.max(components(knn)$csize)
 knn.lcc <- induced_subgraph(knn, lcc, impl = "copy_and_delete")
@@ -82,8 +81,8 @@ sum(lccnm %in% names(membMCL)) #todos los nodos del lcc estan en el resultado de
 table(membMCL[lccnm])
 table(membMCL) #los unicos nodos que faltan en el lcc son de dos pequeñas comunidades
 
-#------------------------------------------------------------------------
-load("~/Documents/dimensionality/results/A_knn40.RData") #tiene com_jac, com_jac_sub, knn, knn_sub, knn.jac, knn.jac_sub
+#celltype----
+#load("~/Documents/dimensionality/results/A_knn40.RData") #tiene com_jac, com_jac_sub, knn, knn_sub, knn.jac, knn.jac_sub
 
 metadata <- read.csv("~/Documents/dimensionality/Neurogenesis/Linnarson_NatNeuro2018/GSE95315/GSE95315_metadata.txt", 
                      sep="\t", header=TRUE, row.names=1)
@@ -106,23 +105,20 @@ adj.rand.index(membMCL, celltypes_nro)
 
 
 # Asortatividad de etiquetas MCL y celltype
-assortativity_nominal(induced_subgraph(jaccgr, names(membMCL)), types=membMCL, directed=FALSE)
-assortativity_nominal(induced_subgraph(jaccgr, names(celltypes_nro)), types=celltypes_nro, directed=FALSE)
+cat("Asortatividad de coms MCL:", assortativity_nominal(induced_subgraph(knn, names(membMCL)), types=membMCL, directed=FALSE))
+cat("Asortatividad de celltypes:", 
+    assortativity_nominal(induced_subgraph(knn, names(celltypes_nro)), types=celltypes_nro, directed=FALSE))
 
-assortativity_nominal(induced_subgraph(knn, names(membMCL)), types=membMCL, directed=FALSE)
-assortativity_nominal(induced_subgraph(knn, names(celltypes_nro)), types=celltypes_nro, directed=FALSE)
 
-#------------------------------------------------------------------------
-# Similitud GSEA
-load("~/Documents/dimensionality/results/fgseaA_res.RData") # cells.es, cells.nes, cells.padj, cells.pval, asort
+# Similitud GSEA----
+#load("~/Documents/dimensionality/results/fgseaA_res.RData") # cells.es, cells.nes, cells.padj, cells.pval, asort
 load("~/Documents/dimensionality/results/fgseaAsub100pcs500genes.RData")
 
-# NOTA: Hay NaN en los resultados de NES, en 14 celulas (obs: en cada uno de ellos, pval=1). ??
-# NES: enrichment score normalized to mean enrichment of random samples of the same size
+# NOTA: Hay NaN en los resultados de NES (enrichment score normalized to mean enrichment of random samples of the same size)
+# en 14 celulas (obs: en cada uno de ellos, pval=1). ??
 nes <- cells.nes[,!is.nan(apply(cells.nes, 2, min))] #tiro las celulas problematicas
 
-# Puede que muchas cosas den similares porque se parecen en que ninguna esta enriquecida en cierta GO
-# Convertir los negativos de ES y NES (son los mismos en ambas) en 0s
+# Convertir los negativos de ES (NES) en 0s para evitar similitud en falta de enriquecimiento
 es0 <- ifelse(cells.es < 0, 0, cells.es)
 nes0 <- ifelse(nes < 0, 0, nes)
 
@@ -136,26 +132,6 @@ logpadj <- ifelse(cells.es < 0, 0, logpadj)
 # Asortatividad vectorial
 asort <- read.table("~/Documents/dimensionality/results/resumen_asort.txt", sep = "\t")
 
-# Asortatividad vectorial por comunidad
-matriz <- cos_sim(nes0)
-
-for (i in 1:length(comms)){
-  nombres <- comms[[i]]
-  nombres <- nombres[nombres %in% colnames(matriz)]
-  red <- induced_subgraph(knn, nombres)
-  r <- assortativity_vect(red, matriz[nombres,nombres])
-  cat("r = ", r, "Comunidad", i, "tamaño", table(membMCL)[i], "\n")
-}
-
-for (i in 1:length(unique(celltypes))){
-  nombres <- names(which(celltypes[lccnm]==unique(celltypes)[i]))
-  nombres <- nombres[nombres %in% colnames(matriz)]
-  red <- induced_subgraph(knn, nombres)
-  r <- assortativity_vect(red, matriz[nombres,nombres])
-  cat("r = ", r, "Comunidad", unique(celltypes)[i], "tamaño", table(celltypes[lccnm])[i],"\n")
-}
-#----
-
 #Hipotesis nula: comparo con el azar cambiando el orden de las columnas
 # armo distribucion (bootstrap)
 N <- 500
@@ -167,12 +143,11 @@ for (j in 1:N){
   red <- induced_subgraph(knn, colnames(azar))
   ra[j] <- assortativity_vect(red, sim.nes_azar)
 }
+hist(ra,xlim=c(0.7,0.8), main = "Distribucion de asortatividad \n en una red al azar", xlab="r")
+abline(v=asort["sim (ES>0)","NES"],col="green")
 
-hist(ra,xlim=c(0.7,0.8))
-abline(v=asort[3,2],col="green")
 
-
-#hacer lo mismo para azar con correlacion
+#hacer lo mismo para azar con correlacion (tarda mas)
 N <- 100
 ra.corr <- rep(0,N)
 for (j in 1:N){
@@ -182,13 +157,11 @@ for (j in 1:N){
   red <- induced_subgraph(knn, colnames(azar))
   ra.corr[j] <- assortativity_vect(red, nes_azar)
 }
-
 hist(ra.corr)#,xlim=c(0.7,0.8))
-abline(v=asort[4,2],col="green")
+abline(v=asort["corr (ES>0)","NES"],col="green")
 
 
-#distribucion (histograma) de similitud entre pares, por comunidad
-# comparo con azar pero sin incluir la propia comunidad
+#distribucion de similitud entre pares por comunidad (comparo con azar pero sin incluir la propia comunidad)
 matriz <- cos_sim(nes0)
 N <- 100
 par(mfrow=c(3,2))
@@ -197,7 +170,7 @@ for (i in 1:6){
   idx <- colnames(matriz) %in% names(membMCL[lccnm])[cuales]
   X <- matriz[idx,idx]
   hist(X[upper.tri(X, diag = FALSE)], freq=FALSE,
-       main=paste("C",i,"tamaño",table(membMCL[lccnm])[i]), xlab = "")
+       main=paste("C",i,"tamaño",table(membMCL[lccnm])[i]), xlab = "", ylim=c(0,10))
   
   npar <- (length(X)-dim(X)[1])/2
   
@@ -210,53 +183,52 @@ for (i in 1:6){
   hist(A, freq=FALSE, col=rgb(1,0,0,0.5), add=TRUE)
 }
 
+#repito lo mismo, pero para pares que pertenezcan a distintas comunidades, sea cual sea
+m <- membMCL[rownames(matriz)[rownames(matriz) %in% names(membMCL)]]
+ccomp <- matrix(rep(0, length(m)^2), nrow=length(m), ncol=length(m),
+               dimnames = list(names(m),names(m)))
+for (i in unique(m)){
+    nombres <- names(m)[m==i]
+    ccomp[nombres,nombres] <- 1
+}
+rm(i,nombres)
+idx <- ccomp[upper.tri(ccomp, diag = FALSE)]
+X <- matriz[rownames(ccomp),colnames(ccomp)]
+pares <- X[upper.tri(X, diag = FALSE)]
+pares <- pares[!idx]
+
+par(mfrow=c(3,2))
+for (i in 1:6){
+  cuales <- which(membMCL[lccnm]==i)
+  idx <- colnames(matriz) %in% names(membMCL[lccnm])[cuales]
+  X <- matriz[idx,idx]
+  hist(X[upper.tri(X, diag = FALSE)], freq=FALSE,
+       main=paste("C",i,"tamaño",table(membMCL[lccnm])[i]), xlab = "", ylim=c(0,10))
+  
+  npar <- (length(X)-dim(X)[1])/2
+  
+  A <- matrix(0, nrow = N, ncol = npar)
+  for (j in 1:dim(A)[1]){
+    A[j,] <- sample(pares, npar)
+  }
+  hist(A, freq=FALSE, col=rgb(1,0,0,0.5), add=TRUE)
+}
+
 
 # silhouette
 library(cluster)
 a <- names(membMCL) %in% colnames(nes0)
-b <- colnames(nes0) %in% names(membMCL)
 X <- membMCL[a]
+
+b <- colnames(nes0) %in% names(membMCL)
 Z <- nes0[,b]
 sil <- silhouette(X[X<23], dmatrix = 1-cos_sim(Z[,names(X[X<23])]), full=TRUE)
 x11()
 plot(sil)
 
 
-# atributo para enlaces: vecinos en comun
-enlaces <- as_edgelist(knn.lcc, names = TRUE)
-frac_comun <- apply(enlaces, 1, function(x){vecinoscomun(knn.lcc,x) })
 
-
-#Centralidad de los enlaces
-kcoreness <- coreness(knn.lcc)
-enlaces <- as_edgelist(knn.lcc, names = TRUE)
-enlaces_k <- enlaces
-enlaces_k[,1] <- kcoreness[enlaces[,1]]
-enlaces_k[,2] <- kcoreness[enlaces[,2]]
-enlaces_k <- matrix(as.integer(enlaces_k), nrow=dim(enlaces_k)[1], ncol=dim(enlaces_k)[2])
-
-edge_core <- apply(enlaces_k, 1, min)
-edge_sim <- apply(enlaces, 1, function(x){ sim.es[x[1], x[2]] })
-
-mean_edge_sim <- rep(0, length(unique(edge_core)))
-for (i in 1:length(unique(edge_core))){
-  mean_edge_sim[i] <- edge_sim[edge_core=unique(edge_core)[i]]
-}
-
-par(mfrow=c(1,1))
-plot(edge_core, edge_sim)
-points(unique(edge_core), mean_edge_sim, col="green", pch=16)
-
-corelist <- sort(unique(edge_core), decreasing = TRUE)
-
-g <- graph_from_edgelist(enlaces[edge_core>corelist[7],], directed = FALSE)
-is.connected(g)
-alphavec <- kcoreness[V(g)]/max(kcoreness[V(g)])
-plot.igraph(g, vertex.label=NA, vertex.size=5, edge.width=0.5,
-            vertex.color = rgb(0,1,0,alphavec))
-
-
-#comparacion entre distintas particiones
+#comparacion entre particiones----
 contingencia <- table(membMCL,celltypes)
 cntg_rows <- rowSums(contingencia)
 cntg_cols <- colSums(contingencia)
@@ -285,11 +257,3 @@ S_cols <- apply(cntg_uni,2,function(x){-log(x)*x})
 S_cols[cntg_uni==0] <- 0
 N <- dim(cntg_uni)[1]
 S_col_max <- -log(1/N)
-
-#------------------------------------------------------------------------
-
-#para participacion y z-score (calculate_toproles.R)
-membership <- membMCL[lccnm]
-g_users <- knn.lcc
-
-plot(kcoreness, p_i)
