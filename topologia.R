@@ -35,7 +35,7 @@ for (i in 1:dim(X)[1]){
   A[i,ordenk[,i]] <- 1 #X[ordenk[,i],i]
 }
 ady <- (A+t(A))/2
-rm(i, A)
+rm(i, A, X)
 ady <- floor(ady) #matriz de adyacencia de k vecinos cercanos mutuos
 
 #los nodos estan en el mismo orden que en la matriz
@@ -105,14 +105,15 @@ adj.rand.index(membMCL, celltypes_nro)
 
 
 # Asortatividad de etiquetas MCL y celltype
-cat("Asortatividad de coms MCL:", assortativity_nominal(induced_subgraph(knn, names(membMCL)), types=membMCL, directed=FALSE))
+cat("Asortatividad de comunidades MCL:", 
+    assortativity_nominal(induced_subgraph(knn, names(membMCL)), types=membMCL, directed=FALSE))
 cat("Asortatividad de celltypes:", 
     assortativity_nominal(induced_subgraph(knn, names(celltypes_nro)), types=celltypes_nro, directed=FALSE))
 
 
 # Similitud GSEA----
 #load("~/Documents/dimensionality/results/fgseaA_res.RData") # cells.es, cells.nes, cells.padj, cells.pval, asort
-load("~/Documents/dimensionality/results/fgseaAsub100pcs500genes.RData")
+load("results/fgseaAsub100pcs500genes.RData")
 
 # NOTA: Hay NaN en los resultados de NES (enrichment score normalized to mean enrichment of random samples of the same size)
 # en 14 celulas (obs: en cada uno de ellos, pval=1). ??
@@ -130,7 +131,7 @@ logpadj <- ifelse(cells.es < 0, 0, logpadj)
 
 
 # Asortatividad vectorial
-asort <- read.table("~/Documents/dimensionality/results/resumen_asort.txt", sep = "\t")
+asort <- read.table("results/resumen_asort.txt", sep = "\t")
 
 #Hipotesis nula: comparo con el azar cambiando el orden de las columnas
 # armo distribucion (bootstrap)

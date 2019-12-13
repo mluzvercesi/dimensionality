@@ -1,6 +1,8 @@
 # load("~/Documents/dimensionality/results/myworkspace.RData")
 # save(object1,object2,file="~/Documents/dimensionality/results/myworkspace.RData")
 # require("package") or "package" %in% rownames(installed.packages())
+wd <- getwd()
+setwd(paste0(wd,"/Documents/dimensionality"))
 
 #------------------------------------------------------------------------
 norm_vect <- function(x) {sqrt(sum(x^2))}

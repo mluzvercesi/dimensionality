@@ -22,35 +22,47 @@ for (i in 1:length(unique(celltypes))){
 
 enlaces <- as_edgelist(knn.lcc, names = TRUE)
 
-edgesim <- apply(as_edgelist(induced_subgraph(knn.lcc, colnames(matriz)[colnames(matriz) %in% vertex_attr(knn.lcc, name = "name")]), names = TRUE), 1, function(x){matriz[x[1],x[2]]})
-edgecoms <- apply(enlaces,2,function(x){membMCL[x]})
-edgebordes <- enlaces[edgecoms[,1]!=edgecoms[,2],]
-simbordes <- apply(edgebordes, 1, function(x){matriz[x[1],x[2]]})
+nodos0 <- colnames(matriz)[colnames(matriz) %in% vertex_attr(knn.lcc, name = "name")] #nodos en nes0 y en el lcc
+knn.lcc0 <- induced_subgraph(knn.lcc, nodos0)
 
-par(mfrow=c(1,1))
-hist(matriz[upper.tri(matriz, diag=FALSE)], freq=FALSE) #comparado con toda la red (enlazada o no)
-hist(simbordes, freq=FALSE, add=TRUE, col=rgb(0,1,0,0.5))
+edges <- as_edgelist(knn.lcc0, names = TRUE)
+edgesim <- apply(edges, 1, function(x){matriz[x[1],x[2]]})
+edgecoms <- apply(edges,2,function(x){membMCL[x]})
 
-hist(edgesim, freq=FALSE, main= "similitud entre nodos enlazados", col=rgb(0,0,1,0.5)) #comparado con todos los enlaces
-hist(simbordes, freq=FALSE, add=TRUE, col=rgb(0,1,0,0.5))
+bordes <- edges[edgecoms[,1]!=edgecoms[,2],]
+bordesim <- apply(bordes, 1, function(x){matriz[x[1],x[2]]})
 
+interior <- edges[edgecoms[,1]==edgecoms[,2],]
+interiorsim <- apply(interior, 1, function(x){matriz[x[1],x[2]]})
+
+
+hist(matriz[upper.tri(matriz, diag=FALSE)], freq=FALSE, main="similitud en toda la red", xlim=c(0.5,1), ylim=c(0,12))
+hist(bordesim, freq=FALSE, add=TRUE, col=rgb(0,0.6,0.5,0.5))
+
+hist(edgesim, freq=FALSE, main= "similitud entre nodos enlazados", xlim=c(0.5,1), ylim=c(0,12))
+hist(bordesim, freq=FALSE, add=TRUE, col=rgb(0,0.6,0.5,0.5))
 
 #por comunidad
 bordescoms <- edgecoms[edgecoms[,1]!=edgecoms[,2],]
 borde_por_com <- rep( list(list()), length(unique(bordescoms[,1])))
-inter_por_com <- rep( list(list()), length(unique(bordescoms[,1])))
 for (c in sort(unique(bordescoms[,1]))){
   idx <- which(apply(bordescoms,1,function(x){if (x[1]==c|x[2]==c){1} else {0}})==1)
-  borde_por_com[[c]] <- apply(edgebordes[idx,], 1, function(x){matriz[x[1],x[2]]})
-}
-
-for (c in sort(unique(bordescoms[,1]))){
-  hist(edgesim, freq=FALSE, main= paste("Comunidad",c, "tamaño", table(membMCL)[c]), col=rgb(0,0,1,0.5), ylim=c(0,10))
-  hist(borde_por_com[[c]], freq=FALSE, add=TRUE, col=rgb(0,1,0,0.2))
+  borde_por_com[[c]] <- apply(bordes[idx,], 1, function(x){matriz[x[1],x[2]]})
+  hist(edgesim, freq=FALSE, main= paste("todos los bordes vs bordes de comunidad \n Comunidad",c, "tamaño", table(membMCL)[c]),
+       xlim=c(0.5,1), ylim=c(0,12))
+  hist(borde_por_com[[c]], freq=FALSE, add=TRUE, col=rgb(0,0.6,0.5,0.5))
 }
 
 #comparar enlaces de borde vs internos
-
+interiorcoms <- edgecoms[edgecoms[,1]==edgecoms[,2],]
+int_por_com <- rep( list(list()), length(unique(interiorcoms[,1])))
+for (c in sort(unique(interiorcoms[,1]))){
+  idx <- which(interiorcoms[,1]==c)
+  int_por_com[[c]] <- apply(interior[idx,], 1, function(x){matriz[x[1],x[2]]})
+  hist(int_por_com[[c]], freq=FALSE, main=paste("enlaces internos vs bordes por comunidad \n Comunidad",c, "tamaño", table(membMCL)[c]),
+       xlim=c(0.5,1), ylim=c(0,12))
+  hist(borde_por_com[[c]], freq=FALSE, add=TRUE, col=rgb(0,0.6,0.5,0.5))
+}
 
 
 
