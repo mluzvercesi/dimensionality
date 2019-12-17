@@ -89,6 +89,14 @@ metadata <- read.csv("~/Documents/dimensionality/Neurogenesis/Linnarson_NatNeuro
 rownames(metadata) <- sub("-",".",rownames(metadata))
 rownames(metadata) <- paste0("X",rownames(metadata))
 
+#
+a <- read.csv(file = "membMCL.txt",header = TRUE, sep=" ", row.names = 1)
+membMCL <- as.array(t(a))
+names(membMCL) <- rownames(a)
+comms <- split(names(membMCL), membMCL)
+rm(a)
+#
+
 celltypes <- as.character(metadata[names(membMCL),"cell_type"])
 names(celltypes) <- names(membMCL)
 
