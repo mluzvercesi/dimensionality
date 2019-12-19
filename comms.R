@@ -21,6 +21,7 @@ for (i in 1:length(unique(celltypes))){
 
 
 enlaces <- as_edgelist(knn.lcc, names = TRUE)
+enlacescoms <- apply(enlaces,2,function(x){membMCL[x]})
 
 nodos0 <- colnames(matriz)[colnames(matriz) %in% vertex_attr(knn.lcc, name = "name")] #nodos en nes0 y en el lcc
 knn.lcc0 <- induced_subgraph(knn.lcc, nodos0)
@@ -39,7 +40,7 @@ interiorsim <- apply(interior, 1, function(x){matriz[x[1],x[2]]})
 hist(matriz[upper.tri(matriz, diag=FALSE)], freq=FALSE, main="similitud en toda la red", xlim=c(0.5,1), ylim=c(0,12))
 hist(bordesim, freq=FALSE, add=TRUE, col=rgb(0,0.6,0.5,0.5))
 
-hist(edgesim, freq=FALSE, main= "similitud entre nodos enlazados", xlim=c(0.5,1), ylim=c(0,12))
+hist(edgesim, freq=FALSE, main= "similitud entre nodos enlazados", xlim=c(0.5,1), ylim=c(0,12), col=rgb(0,0,0.5,0.5))
 hist(bordesim, freq=FALSE, add=TRUE, col=rgb(0,0.6,0.5,0.5))
 
 #por comunidad
@@ -49,7 +50,7 @@ for (c in sort(unique(bordescoms[,1]))){
   idx <- which(apply(bordescoms,1,function(x){if (x[1]==c|x[2]==c){1} else {0}})==1)
   borde_por_com[[c]] <- apply(bordes[idx,], 1, function(x){matriz[x[1],x[2]]})
   hist(edgesim, freq=FALSE, main= paste("todos los bordes vs bordes de comunidad \n Comunidad",c, "tamaño", table(membMCL)[c]),
-       xlim=c(0.5,1), ylim=c(0,12))
+       xlim=c(0.5,1), ylim=c(0,12), col=rgb(0,0,0.5,0.5))
   hist(borde_por_com[[c]], freq=FALSE, add=TRUE, col=rgb(0,0.6,0.5,0.5))
 }
 
@@ -60,10 +61,27 @@ for (c in sort(unique(interiorcoms[,1]))){
   idx <- which(interiorcoms[,1]==c)
   int_por_com[[c]] <- apply(interior[idx,], 1, function(x){matriz[x[1],x[2]]})
   hist(int_por_com[[c]], freq=FALSE, main=paste("enlaces internos vs bordes por comunidad \n Comunidad",c, "tamaño", table(membMCL)[c]),
-       xlim=c(0.5,1), ylim=c(0,12))
+       xlim=c(0.5,1), ylim=c(0,12), col=rgb(0,0,0.5,0.5))
   hist(borde_por_com[[c]], freq=FALSE, add=TRUE, col=rgb(0,0.6,0.5,0.5))
 }
 
+#comparacion
+options(bitmapType="cairo")
+for (c in sort(unique(bordescoms[,1]))){
+  png(paste0("fig/coms_mcl_",c,".png"), width = 988, height = 494)
+  par(mfrow=c(1,2))
+  hist(edgesim, freq=FALSE, main= paste("todos los bordes vs bordes de comunidad \n Comunidad",c, "tamaño", table(membMCL)[c]),
+       xlim=c(0.5,1), ylim=c(0,12), col=rgb(0.8,0.1,0,0.5))
+  hist(borde_por_com[[c]], freq=FALSE, add=TRUE, col=rgb(0,0.6,0.5,0.5))
+  hist(int_por_com[[c]], freq=FALSE, main=paste("enlaces internos vs bordes por comunidad \n Comunidad",c, "tamaño", table(membMCL)[c]),
+       xlim=c(0.5,1), ylim=c(0,12), col=rgb(0,0,0.5,0.5))
+  hist(borde_por_com[[c]], freq=FALSE, add=TRUE, col=rgb(0,0.6,0.5,0.5))
+  dev.off()
+}
+
+
+boxplot.default(c(borde_por_com, int_por_com), at=c(seq(1,44,2),seq(2,44,2)), col=c(rep("orange",22),rep("cyan",22)))
+legend('bottomright', legend = c('borde','interior'), col = c('orange', 'cyan'), pch=15)
 
 
 # atributo para enlaces: vecinos en comun
@@ -105,5 +123,57 @@ plot.igraph(g, vertex.label=NA, vertex.size=5, edge.width=0.5,
 #para participacion y z-score (calculate_toproles.R)
 membership <- membMCL[lccnm]
 g_users <- knn.lcc
+
+nodos_perif <- unique(as.list(enlaces[enlacescoms[,1]!=enlacescoms[,2],]))
+n <- unique(as.list(enlaces[enlacescoms[,1]==enlacescoms[,2],]))
+nodos_centr <- n[!(n %in% nodos_perif)]
+nodos_centr <- do.call(c, nodos_centr)
+nodos_perif <- do.call(c, nodos_perif)
+
+pz <- list(names(connector_hubs), names(connector_nonhubs), names(provincial_hubs), names(provincial_nonhubs))
+names(pz) <- c("con_h", "con_nh", "prov_h", "prov_nh")
+a <- reverseSplit(pz)
+a <- unlist(a)
+centralidad <- list(nodos_centr,nodos_perif)
+names(centralidad) <- c("centr", "perif")
+b <- reverseSplit(centralidad)
+b <- unlist(b)
+table(a,b)
+
+
+membership <- celltypes_nro[lccnm]
+
+enlacesct <- apply(enlaces,2,function(x){celltypes[x]})
+nodos_perif2 <- unique(as.list(enlaces[enlacesct[,1]!=enlacesct[,2],]))
+n2 <- unique(as.list(enlaces[enlacesct[,1]==enlacesct[,2],]))
+nodos_centr2 <- n2[!(n2 %in% nodos_perif2)]
+nodos_centr2 <- do.call(c, nodos_centr2)
+nodos_perif2 <- do.call(c, nodos_perif2)
+
+pz2 <- list(names(connector_hubs), names(connector_nonhubs), names(provincial_hubs), names(provincial_nonhubs))
+names(pz2) <- c("con_h", "con_nh", "prov_h", "prov_nh")
+c <- reverseSplit(pz2)
+c <- unlist(c)
+centralidad2 <- list(nodos_centr2,nodos_perif2)
+names(centralidad2) <- c("centr", "perif")
+d <- reverseSplit(centralidad2)
+d <- unlist(d)
+table(c,d)
+
+
+plot(p_i1[nodos_perif], z_i1[nodos_perif], col="blue",main="Comunidades MCL", 
+     xlim=c(min(p_i),max(p_i)), ylim = c(min(z_i), max(z_i)), xlab="participacion", ylab="grado en comunidad")
+points(p_i1[nodos_centr], z_i1[nodos_centr], col="cyan")
+abline(v=mean(p_i1),lwd=2, lty=2,col='green')
+abline(h=0,lwd=2, lty=2,col='green')
+legend('topright', legend=c('perifericos','centrales'),col=c('blue','cyan'),pch=c(1,1))
+
+plot(p_i2[nodos_perif2], z_i2[nodos_perif2], col="blue",main="Comunidades celltype", 
+     xlim=c(min(p_i2),max(p_i2)), ylim = c(min(z_i2), max(z_i2)), xlab="participacion", ylab="grado en comunidad")
+points(p_i2[nodos_centr2], z_i2[nodos_centr2], col="cyan")
+abline(v=mean(p_i2),lwd=2, lty=2,col='green')
+abline(h=0,lwd=2, lty=2,col='green')
+legend('topright', legend=c('perifericos','centrales'),col=c('blue','cyan'),pch=c(1,1))
+
 
 plot(kcoreness, p_i)

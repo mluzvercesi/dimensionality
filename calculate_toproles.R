@@ -26,6 +26,7 @@ module_links = modu_map %*% adyacencia #Si mapeo la adyacencia por los modulos t
 
 p_i = 1 - (colSums(module_links ** 2) / (degree(g_users) ** 2)) #Calculo el p-score de Guimera (2005).
 p_i[degree(g_users)==0] <- 0
+names(z_i) <- names(p_i)
 
 #Calculo cuales cumplen cada rol.
 small_z = which(z_i < 0)
