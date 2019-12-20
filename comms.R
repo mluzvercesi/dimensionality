@@ -80,7 +80,7 @@ for (c in sort(unique(bordescoms[,1]))){
 }
 
 
-boxplot.default(c(borde_por_com, int_por_com), at=c(seq(1,44,2),seq(2,44,2)), col=c(rep("orange",22),rep("cyan",22)))
+boxplot.default(c(borde_por_com[1:13], int_por_com[1:13]), at=c(seq(1,26,2),seq(2,26,2)), col=c(rep("orange",13),rep("cyan",13)))
 legend('bottomright', legend = c('borde','interior'), col = c('orange', 'cyan'), pch=15)
 
 
@@ -117,6 +117,28 @@ is.connected(g)
 alphavec <- kcoreness[V(g)]/max(kcoreness[V(g)])
 plot.igraph(g, vertex.label=NA, vertex.size=5, edge.width=0.5,
             vertex.color = rgb(0,1,0,alphavec))
+
+#-----
+#grafo de comunidades como nodos
+b <- apply(enlacescoms, 1, sort)
+g <- make_graph(as.vector(b), directed = FALSE)
+
+E(g)$weight <- 1
+g2 <- simplify(g, edge.attr.comb=list(weight="sum"), remove.loops = FALSE)
+
+nodesizes <- as.integer(table(membMCL)[1:vcount(g2)])
+g2 <- set_vertex_attr(g2, "size", value=2*log(nodesizes))
+
+#veo las comunidades con loops
+E(g2)[which_loop(g2)]
+loopweights <- get.edge.attribute(g2, name = "weight", index = which(which_loop(g2)))
+
+gMCL <- simplify(g2)
+plot(gMCL)
+
+#COMPARAR SIMILITUD ENTRE COMUNIDADES "LEJANAS"
+
+
 
 #------------------------------------------------------------------------
 
