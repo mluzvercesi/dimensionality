@@ -8,6 +8,9 @@ TFnet <- TFnet0[!tgrm,]
 #filtro por MI
 TFnet <- TFnet[TFnet[,"MI"]>0.5,]
 
+#para usar la base de datos CHEA3, tengo que cambiar los nombres
+library(org.Mm.eg.db)
+
 TFnm.ens <-  as.character(unique(TFnet[,"Regulator"]))
 TFnm.hugo <- as.character(mapIds(org.Mm.eg.db, keys = TFnm.ens, column="SYMBOL", keytype = "ENSEMBL"))
 TFlist <- rep( list(list()), length(TFnm.ens))
@@ -21,14 +24,14 @@ for (nm in names(TFlist)){
 #creo que no es necesario filtrar por tamaño de regulon, porque el filtro de MI se deshace de los mas grandes
 #lo mismo para cantidad de reguladores por target
 
-#para usar la base de datos CHEA3, tengo que cambiar los nombres
-library(org.Mm.eg.db)
+library(httr)
+library(jsonlite)
 url = "https://amp.pharm.mssm.edu/chea3/api/enrich/"
 encode = "json"
 
 #Tomo cada regulon como un gene set, y me fijo que rank tiene el regulador en cada base de datos de CHEA
 for (i in length(TFnm.ens):1){
-  #i <- 75
+  #i <- 3
   geneset <- TFlist[[i]]
   hugo <- as.character(mapIds(org.Mm.eg.db, keys = geneset, column="SYMBOL", keytype = "ENSEMBL"))
   hugo <- hugo[!is.na(hugo)]
@@ -47,17 +50,24 @@ for (i in length(TFnm.ens):1){
       else{
         results_chea[[j]] <- results_chea[[j]][idx,]
       }
-    }
+    }#loop j libraries ChEA3
     TFranks[[i]] <- results_chea
+    rm(results_chea,j, payload, response)
+  }#if tamaño >1
+  else{
+    TFranks[[i]] <- paste(TFnm.hugo[i], "tiene < 2 elementos")
   }
-}
+  rm(geneset, hugo)
+  Sys.sleep(0.4)
+}#loop i en regulones
+
+load("aracne/TFranks.RData")
+
 
 lista <- as.character(unique(TFnet[,"Target"]))
 hugolist <- mapIds(org.Mm.eg.db, keys = lista, column="SYMBOL", keytype = "ENSEMBL")
 writeLines(as.character(hugo), con="lista_hugo.txt")
 
-library(httr)
-library(jsonlite)
 
 genes = c("SMAD9","FOXO1","MYC","STAT1",'STAT3',"SMAD3") #ejemplo
 genes <- as.character(hugolist)
