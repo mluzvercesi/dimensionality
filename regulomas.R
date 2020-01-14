@@ -3,10 +3,10 @@ expresion <- read.table(file = "aracne/MatrizRemoveBatchARACNe.txt", header = TR
 TFnet0 <- read.table(file = "aracne/network.txt", header=TRUE)
 
 tgrm <- TFnet0[,"Target"] %in% unique(TFnet0[,"Regulator"])
-TFnet <- TFnet0[!tgrm,]
+TFnet1 <- TFnet0[!tgrm,]
 
 #filtro por MI
-TFnet <- TFnet[TFnet[,"MI"]>0.5,]
+TFnet <- TFnet1[TFnet1[,"MI"]>0.5,]
 
 #para usar la base de datos CHEA3, tengo que cambiar los nombres
 library(org.Mm.eg.db)
@@ -24,6 +24,10 @@ for (nm in names(TFlist)){
 #creo que no es necesario filtrar por tamaño de regulon, porque el filtro de MI se deshace de los mas grandes
 #lo mismo para cantidad de reguladores por target
 
+lista <- as.character(unique(TFnet[,"Target"]))
+hugolist <- mapIds(org.Mm.eg.db, keys = lista, column="SYMBOL", keytype = "ENSEMBL")
+writeLines(as.character(hugo), con="lista_hugo.txt")
+
 library(httr)
 library(jsonlite)
 url = "https://amp.pharm.mssm.edu/chea3/api/enrich/"
@@ -31,7 +35,7 @@ encode = "json"
 
 #Tomo cada regulon como un gene set, y me fijo que rank tiene el regulador en cada base de datos de CHEA
 for (i in length(TFnm.ens):1){
-  #i <- 3
+  i <- 8
   geneset <- TFlist[[i]]
   hugo <- as.character(mapIds(org.Mm.eg.db, keys = geneset, column="SYMBOL", keytype = "ENSEMBL"))
   hugo <- hugo[!is.na(hugo)]
@@ -63,24 +67,23 @@ for (i in length(TFnm.ens):1){
 
 load("aracne/TFranks.RData")
 
+summary_reg <- matrix(rep(0, length(TFranks)*8), nrow = length(TFranks), ncol = 8)
+rownames(summary_reg) <- TFnm.hugo
+colnames(summary_reg) <- names(TFranks[[26]])
 
-lista <- as.character(unique(TFnet[,"Target"]))
-hugolist <- mapIds(org.Mm.eg.db, keys = lista, column="SYMBOL", keytype = "ENSEMBL")
-writeLines(as.character(hugo), con="lista_hugo.txt")
-
-
-genes = c("SMAD9","FOXO1","MYC","STAT1",'STAT3',"SMAD3") #ejemplo
-genes <- as.character(hugolist)
-url = "https://amp.pharm.mssm.edu/chea3/api/enrich/"
-encode = "json"
-payload = list(query_name = "myQuery", gene_set = genes)
-
-#POST to ChEA3 server
-response = POST(url = url, body = payload, encode = encode)
-json = httr::content(response, "text") # CUIDADO! esta funcion es de httr, no de bioconductor
-
-#results as list of R dataframes
-results_chea = fromJSON(json)
+for (i in 1:length(TFnm.ens)){
+  if (length(TFranks[[i]])<2){ #si es muy grande o muy chico (<2 elementos)
+    summary_reg[i,] <- rep(NA, 8)
+  }else{
+    for (j in 1:8){
+      if (length(TFranks[[i]][[j]])==1){ #si no esta rankeado
+        summary_reg[i,j] <- 0
+      }else{
+        summary_reg[i,j] <- as.numeric(TFranks[[i]][[j]][["Rank"]])
+      }
+    }
+  }
+}
 
 
 TFcorr <- function(target, tflist, expr){
