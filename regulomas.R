@@ -20,6 +20,17 @@ for (nm in names(TFlist)){
   idx <- which(TFnet[,"Regulator"]==nm)
   TFlist[[nm]] <- as.character(TFnet[idx,"Target"])
 }
+#o sino
+TFnm.ens1 <-  as.character(unique(TFnet1[,"Regulator"]))
+TFlist1 <- rep( list(list()), length(TFnm.ens1))
+names(TFlist1) <- TFnm.ens1
+for (nm in names(TFlist1)){
+  idx <- which(TFnet1[,"Regulator"]==nm)
+  submatrix <- TFnet1[idx,]
+  orden <- order(submatrix[,"MI"], decreasing = TRUE)
+  TFlist1[[nm]] <- submatrix[orden[1:50],2:3]
+}
+
 
 #creo que no es necesario filtrar por tamaño de regulon, porque el filtro de MI se deshace de los mas grandes
 #lo mismo para cantidad de reguladores por target
