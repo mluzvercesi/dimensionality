@@ -37,7 +37,7 @@ for (nm in names(TFlist1)){
 
 lista <- as.character(unique(TFnet[,"Target"]))
 hugolist <- mapIds(org.Mm.eg.db, keys = lista, column="SYMBOL", keytype = "ENSEMBL")
-writeLines(as.character(hugo), con="lista_hugo.txt")
+writeLines(as.character(hugolist), con="lista_hugo.txt")
 
 library(httr)
 library(jsonlite)
