@@ -108,7 +108,7 @@ save(cells.es, cells.nes, cells.pval, cells.padj, file="~/Documents/dimensionali
 # 1.968373 hs, 1553 de 2932 con 10k permutaciones, el resto con 1k (res_mix.RData)
 
 load("~/Documents/dimensionality/results/fgseaAsub100pcs500genes.RData")
-GOidx <- apply(cells.padj, 1, function(x){if (sum(x<0.05)>0) {1} else {0}})
+GOidx <- apply(cells.padj, 1, function(x){if (sum(x<0.05)>1) {1} else {0}})
 dim(cells.padj[GOidx,])
 
 #------------------------------------------------------------------------

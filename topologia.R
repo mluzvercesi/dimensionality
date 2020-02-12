@@ -128,7 +128,7 @@ load("results/fgseaAsub100pcs500genes.RData")
 nes <- cells.nes[,!is.nan(apply(cells.nes, 2, min))] #tiro las celulas problematicas
 
 # Convertir los negativos de ES (NES) en 0s para evitar similitud en falta de enriquecimiento
-es0 <- ifelse(cells.es < 0, 0, cells.es)
+es0 <- ifelse(cells.es < 0, 0, cells.es) #tal vez conviene eliminar esas 9 celulas para que tengan la misma dimension
 nes0 <- ifelse(nes < 0, 0, nes)
 
 # Filtrar ES y NES por padj: tomo -log y me fijo los significativos
