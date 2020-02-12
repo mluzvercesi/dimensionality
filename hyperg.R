@@ -81,7 +81,7 @@ rm(i, hg, hyperg_df, index, hyperg_results, params, selected_genes_id, selected_
 #load("~/Documents/dimensionality/results/hgsAsub1000genes.RData")
 #------------------------------------------------------------------------
 # REPRESENTACION VISUAL--------------------------------------------------
-load("~/Documents/dimensionality/results/Ahg.RData")
+load("~/Documents/dimensionality/results/hgsAsub500genes.RData")
 
 nervdev_offs <- get("GO:0007399",GOBPOFFSPRING) # nervous system development (incluye neurogen)
 #neuro_offs <- get("GO:0022008",GOBPOFFSPRING) # neurogenesis
