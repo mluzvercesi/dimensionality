@@ -77,16 +77,12 @@ end_time <- Sys.time()
 cat(sprintf("Tardó %.2f minutos\n", end_time-start_time))
 rm(i, hg, hyperg_df, index, hyperg_results, params, selected_genes_id, selected_genes, orderedgenes,end_time, start_time)
 
-#save(hgs,file="~/Documents/dimensionality/results/hgsAsub1000genes.RData")
-#load("~/Documents/dimensionality/results/hgsAsub1000genes.RData")
-#------------------------------------------------------------------------
 # REPRESENTACION VISUAL--------------------------------------------------
-load("~/Documents/dimensionality/results/hgsAsub500genes.RData")
+load("~/Documents/dimensionality/results/hgsAsub500genes.RData") #hgs, gopcs
 
 nervdev_offs <- get("GO:0007399",GOBPOFFSPRING) # nervous system development (incluye neurogen)
 #neuro_offs <- get("GO:0022008",GOBPOFFSPRING) # neurogenesis
 
-hgs <- hgsA
 cat <- unique(hgs[,"GOBPID"]) #categorias GO
 cols <- unique(hgs[,"PC"])
 Npcs <- length(cols)
@@ -116,9 +112,6 @@ rm(ind_nerv)
 heatmap.2(gopcs,trace="none") # todo
 heatmap.2(sqrt(gopcs), trace="none") #reescalada
 heatmap(sqrt(gopcs[gopcs[,"Neuro"]==.001,])) # solo las neuro, reescaladas
-
-load("~/Documents/dimensionality/results/gopcs.RData")
-gopcs <- gopcsA
 
 if(FALSE){
   gopcs01 <- gopcs
@@ -228,6 +221,7 @@ rm(i, lista_pc, subG, maximo, indices_nerv,indices_pc,ind_coord,fn)
 
 #------------------------------------------------------------------------
 # DISTANCIA ENTRE PCS----------------------------------------------------
+# NOTA: si lo hago con las categorias que quedan enriquecidas, me quedan PCS con todas y con ninguna, pero nada intermedio
 coseno <- cos_sim(gopcs) #le resto la media?
 
 distcos <- 1-coseno #deberia calcular otra distancia?
@@ -245,17 +239,21 @@ for (i in 1:length(nombres)){
   indices_nerv <- names(igo) %in% nervdev_offs
   terms_si <- as.character(Term(names(igo[indices_nerv])))
   terms_si <- paste(terms_si, collapse="</br>")
-  terms_si <- paste0("</br><b>",terms_si, "</b>")
+  terms_si <- paste0("</br>",terms_si)
   
   terms_no <- as.character(Term(names(igo[!indices_nerv])))
-  terms_no <- paste(terms_no, collapse="</br>")
-  terms_no <- paste0("</br>",terms_no)
+  if (length(terms_no)>10){
+    terms_no <- paste(terms_no[1:10], collapse="</br>")
+  }else{
+    terms_no <- paste(terms_no, collapse="</br>")
+  }
+  terms_no <- paste0("</br><i>",terms_no, "</i>")
   
   go_terms_order <- paste(terms_si, terms_no)
   
   summaries <- c(summaries, go_terms_order)
 }
-rm(i, igo, go_terms_i)
+rm(i, igo, go_terms_order)
 
 plot(x, y, type = "n", xlab = "", ylab = "", asp = 1, axes = FALSE)
 text(x, y, nombres, cex = 0.6)
@@ -265,7 +263,7 @@ library(plotly)
 ax <- list(title = "", zeroline = F, showline = F, showticklabels = F, showgrid = F)
 plot_ly (x=x,y=y, type='scatter', mode='text',
          text=nombres, hovertext=summaries, hoverinfo='text', showlegend=F, 
-         hoverlabel=list(namelength=-1, font=list(size=8)))%>%
+         hoverlabel=list(namelength=-1, font=list(size=9)))%>%
   layout(xaxis = ax, yaxis = ax)
 
 h <- hclust(as.dist(distcos),method = "ward.D")
