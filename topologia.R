@@ -266,3 +266,17 @@ S_cols <- apply(cntg_uni,2,function(x){-log(x)*x})
 S_cols[cntg_uni==0] <- 0
 N <- dim(cntg_uni)[1]
 S_col_max <- -log(1/N)
+
+#----
+Ngen <- dim(dataAsub)[1]
+enlaces <- as_edgelist(knn)
+a <- apply(enlaces, 1, function(x){sum((dataAsub[,x[1]]+dataAsub[,x[2]])==0)})
+dropoutperc <- a/Ngen
+
+similitud <- cos_sim(dataAsub)
+similitudpares <- apply(enlaces, 1, function(x){similitud[x[1],x[2]]})
+plot(similitudpares, dropoutperc)
+
+compaste <- apply(enlaces, 1, function(x){paste(sort(c(membMCL[x[1]],membMCL[x[2]])),collapse="")})
+colores #tiene length de compaste
+#puedo calcular similitud pero solo con las partes no nulas del vector?
