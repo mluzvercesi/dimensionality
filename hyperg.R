@@ -258,11 +258,11 @@ rm(i, igo, go_terms_order)
 plot(x, y, type = "n", xlab = "", ylab = "", asp = 1, axes = FALSE)
 text(x, y, nombres, cex = 0.6)
 
-
+nombres[101] <- "nerv.syst. development"
 library(plotly)
 ax <- list(title = "", zeroline = F, showline = F, showticklabels = F, showgrid = F)
 plot_ly (x=x,y=y, type='scatter', mode='text',
-         text=nombres, hovertext=summaries, hoverinfo='text', showlegend=F, 
+         text=nombres, color=c(rep('#000000',100),'#00FF00'), hovertext=summaries, hoverinfo='text', showlegend=F, 
          hoverlabel=list(namelength=-1, font=list(size=9)))%>%
   layout(xaxis = ax, yaxis = ax)
 
