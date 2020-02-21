@@ -269,7 +269,7 @@ S_col_max <- -log(1/N)
 
 #----
 Ngen <- dim(dataAsub)[1]
-enlaces <- as_edgelist(knn)
+enlaces <- as_edgelist(knn.lcc)
 a <- apply(enlaces, 1, function(x){sum((dataAsub[,x[1]]+dataAsub[,x[2]])==0)})
 dropoutperc <- a/Ngen
 
@@ -277,6 +277,21 @@ similitud <- cos_sim(dataAsub)
 similitudpares <- apply(enlaces, 1, function(x){similitud[x[1],x[2]]})
 plot(similitudpares, dropoutperc)
 
-compaste <- apply(enlaces, 1, function(x){paste(sort(c(membMCL[x[1]],membMCL[x[2]])),collapse="")})
-colores #tiene length de compaste
+intracom <- membMCL[enlaces[,1]]
+idx <- apply(enlaces, 1, function(x){membMCL[x[1]]!=membMCL[x[2]]})
+intracom[idx] <- 0
+intracom[idx] <- max(intracom)+1
+colores <- rainbow(length(unique(intracom))-1)
+colores <- c(colores, 'black')
+
+plot(similitudpares, dropoutperc, col=colores[intracom])
+legend('bottomleft', legend=c(seq(1:18),'dif'), col=colores, pch=1, cex=0.7)
+
+#por com
+xs <- par("usr")[1:2]
+ys <- par("usr")[3:4]
+i <- 4
+idx1 <- apply(enlaces, 1, function(x){if (membMCL[x[1]]==i | membMCL[x[2]]==i){TRUE} else {FALSE}})
+plot(similitudpares[idx1], dropoutperc[idx1], col=colores[intracom[idx1]], main=paste('Comunidad',i), xlim=xs, ylim=ys)
+
 #puedo calcular similitud pero solo con las partes no nulas del vector?
