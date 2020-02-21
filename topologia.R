@@ -287,11 +287,14 @@ colores <- c(colores, 'black')
 plot(similitudpares, dropoutperc, col=colores[intracom])
 legend('bottomleft', legend=c(seq(1:18),'dif'), col=colores, pch=1, cex=0.7)
 
-#por com
+#por comunidad
 xs <- par("usr")[1:2]
 ys <- par("usr")[3:4]
-i <- 4
-idx1 <- apply(enlaces, 1, function(x){if (membMCL[x[1]]==i | membMCL[x[2]]==i){TRUE} else {FALSE}})
-plot(similitudpares[idx1], dropoutperc[idx1], col=colores[intracom[idx1]], main=paste('Comunidad',i), xlim=xs, ylim=ys)
 
-#puedo calcular similitud pero solo con las partes no nulas del vector?
+par(mfrow=c(2,3))
+for (i in 1:12){
+  idx1 <- apply(enlaces, 1, function(x){if (membMCL[x[1]]==i | membMCL[x[2]]==i){TRUE} else {FALSE}})
+  plot(similitudpares[idx1], dropoutperc[idx1], col=colores[intracom[idx1]], main=paste('Comunidad',i), xlim=xs, ylim=ys)
+}
+
+# calcular similitud pero solo con las partes no nulas del vector?
