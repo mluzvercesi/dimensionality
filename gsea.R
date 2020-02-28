@@ -1,10 +1,9 @@
-load("~/Documents/dimensionality/results/Asubconjunto.RData")
 library(fgsea) 
 # fgsea: Update old packages: 'AnnotationDbi', 'foreign', 'IRanges', 'nlme', 'Rcpp', 'RSQLite', 'sys'
 library(org.Mm.eg.db)
 #------------------------------------------------------------------------
 # Pre procesamiento
-load("~/Documents/dimensionality/results/Asubconjunto.RData")
+load("results/Asubconjunto.RData")
 rm(pcaAsub,pcaAsub_scaled)
 X <- dataAsub
 
@@ -62,8 +61,7 @@ rownames(Z) <- sym2eg(rownames(Z))
 #------------------------------------------------------------------------
 # GSEA
 # Cada columna de la matriz Z es una celula, es decir un vector de ranks
-# save(Z,gopcsA,file="~/Documents/dimensionality/results/gseaA.RData")
-load("~/Documents/dimensionality/results/gseaA.RData")
+load("results/gseaA.RData") #Z,gopcsA
 
 gonames <- rownames(gopcs)
 Ngo <- length(gonames)
@@ -104,11 +102,10 @@ rm(i,p,dospor,zranks,gsea_res)
 end_time <- Sys.time()
 print(end_time-start_time)
 rm(start_time,end_time)
-save(cells.es, cells.nes, cells.pval, cells.padj, file="~/Documents/dimensionality/results/fgseaAsub100pcs500genes.RData")
-# 1.968373 hs, 1553 de 2932 con 10k permutaciones, el resto con 1k (res_mix.RData)
+# (res_mix.RData) 1.968373 hs, 1553 de 2932 con 10k permutaciones, el resto con 1k
 
-load("~/Documents/dimensionality/results/fgseaAsub100pcs500genes.RData")
-GOidx <- apply(cells.padj, 1, function(x){if (sum(x<0.05)>1) {1} else {0}})
+load("results/fgseaAsub100pcs500genes.RData") #cells.es, cells.nes, cells.pval, cells.padj
+GOidx <- apply(cells.padj, 1, function(x){if (sum(x<0.05)>1) {TRUE} else {FALSE}})
 dim(cells.padj[GOidx,])
 
 #------------------------------------------------------------------------
@@ -117,7 +114,7 @@ logp <- -log(cells.padj)
 sim.log <- cos_sim(logp)
 cor.log <- cor(logp)
 
-load("~/Documents/dimensionality/results/fgseaA_res.RData")
+load("results/fgseaA_res.RData")
 # cells.es, cells.nes, cells.padj, cells.pval, sim.log
 
 sim.nes <- cos_sim(cells.nes) 

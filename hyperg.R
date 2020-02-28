@@ -1,7 +1,7 @@
 source("~/Documents/dimensionality/funciones.R")
 #------------------------------------------------------------------------
-load("~/Documents/dimensionality/results/Apca.RData")
-load("~/Documents/dimensionality/results/Asubconjunto.RData")
+load("results/Apca.RData")
+load("results/Asubconjunto.RData")
 
 library(GO.db)
 library(GOstats)
@@ -15,7 +15,7 @@ get("17708", org.Mm.egGENENAME) # para un solo gen, por ejemplo
 
 #---------
 #podria ser util para corregir algunos errores en los nombres:
-a<-read.table("Documents/Neurogenesis/Linnarson_NatNeuro2018/GSE95315/GSE95315_metadata.txt",sep="\t",header=TRUE)
+a<-read.table("Neurogenesis/Linnarson_NatNeuro2018/GSE95315/GSE95315_metadata.txt",sep="\t",header=TRUE)
 table(a[,2])
 
 a<-as.list(org.Mm.egALIAS2EG)
@@ -78,7 +78,7 @@ cat(sprintf("Tardó %.2f minutos\n", end_time-start_time))
 rm(i, hg, hyperg_df, index, hyperg_results, params, selected_genes_id, selected_genes, orderedgenes,end_time, start_time)
 
 # REPRESENTACION VISUAL--------------------------------------------------
-load("~/Documents/dimensionality/results/hgsAsub500genes.RData") #hgs, gopcs
+load("results/hgsAsub500genes.RData") #hgs, gopcs
 
 nervdev_offs <- get("GO:0007399",GOBPOFFSPRING) # nervous system development (incluye neurogen)
 #neuro_offs <- get("GO:0022008",GOBPOFFSPRING) # neurogenesis
@@ -180,7 +180,7 @@ colores2 <- c("blue","lightblue")
 V(G)$type <- 2
 V(G)$type[V(G)$name %in% lista_nerv] <- 1
 
-png("~/Documents/dimensionality/fig/grafo_resnik_completo.png")
+png("fig/grafo_resnik_completo.png")
 plot.igraph(G, layout=l, rescale=FALSE, vertex.size=10, vertex.color=adjustcolor(colores2[V(G)$type], alpha.f=.5),
             vertex.label=NA,edge.width=E(G)$weight/max_weight,
             main="Categorias GO (BP)")
@@ -208,7 +208,7 @@ for (i in 1:(length(colnames(gopcs))-1)){ #para cada pc
     print("Paso algo con los indices")
   }
   
-  fn <- paste0("~/Documents/dimensionality/fig/grafo_resnik_pc",i)
+  fn <- paste0("fig/grafo_resnik_pc",i)
   #png(fn)
   plot.igraph(subG, layout=l[ind_coord,], rescale=FALSE, vertex.size=10,
               vertex.color=adjustcolor(colores3[V(subG)$type], alpha.f=.5), vertex.label=NA,

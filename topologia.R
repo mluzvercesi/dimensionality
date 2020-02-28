@@ -24,9 +24,8 @@ X <- cor_cells # se podria hacer con similarity en vez de correlacion pero da la
 diag(X) <- 0
 k <- 40
 # knn: ordeno cada fila (modulo), me quedo con los k mayores (k es umbral)
-ordenk <- apply(abs(X),1, function(x){order(x, decreasing = TRUE)})
+ordenk <- apply(abs(X),1, function(x){order(x, decreasing = TRUE)})[1:k,]
 # las columnas de ordenk corresponden al orden de las filas de X
-ordenk <- ordenk[1:k,]
 
 A <- matrix(0L, nrow = dim(X)[1], ncol = dim(X)[2])
 rownames(A) <- rownames(X)
@@ -82,27 +81,15 @@ table(membMCL[lccnm])
 table(membMCL) #los unicos nodos que faltan en el lcc son de dos pequeÃ±as comunidades
 
 #celltype----
-#load("~/Documents/dimensionality/results/A_knn40.RData") #tiene com_jac, com_jac_sub, knn, knn_sub, knn.jac, knn.jac_sub
-
-metadata <- read.csv("~/Documents/dimensionality/Neurogenesis/Linnarson_NatNeuro2018/GSE95315/GSE95315_metadata.txt", 
-                     sep="\t", header=TRUE, row.names=1)
+metadata <- read.csv("Neurogenesis/Linnarson_NatNeuro2018/GSE95315/GSE95315_metadata.txt", sep="\t", header=TRUE, row.names=1)
 rownames(metadata) <- sub("-",".",rownames(metadata))
 rownames(metadata) <- paste0("X",rownames(metadata))
-
-#
-a <- read.csv(file = "membMCL.txt",header = TRUE, sep=" ", row.names = 1)
-membMCL <- as.array(t(a))
-names(membMCL) <- rownames(a)
-comms <- split(names(membMCL), membMCL)
-rm(a)
-#
 
 celltypes <- as.character(metadata[names(membMCL),"cell_type"])
 names(celltypes) <- names(membMCL)
 
 celltypes_nro <- as.numeric(factor(celltypes))
 names(celltypes_nro) <- names(celltypes)
-
 
 # Indice Rand
 indice.rand(membMCL, celltypes_nro)
@@ -120,11 +107,11 @@ cat("Asortatividad de celltypes:",
 
 
 # Similitud GSEA----
-#load("~/Documents/dimensionality/results/fgseaA_res.RData") # cells.es, cells.nes, cells.padj, cells.pval, asort
+#load("results/fgseaA_res.RData") # cells.es, cells.nes, cells.padj, cells.pval, asort
 load("results/fgseaAsub100pcs500genes.RData")
 
-#Filtro por p ajustado: solo me quedo con la categoria GO si tengo más de una entrada con p menor que .05
-GOidx <- apply(cells.padj, 1, function(x){if (sum(x<0.05)>1) {1} else {0}}) 
+#Filtro por p ajustado: solo me quedo con la categoria GO si tengo m?s de una entrada con p menor que .05
+GOidx <- apply(cells.padj, 1, function(x){if (sum(x<0.05)>1) {TRUE} else {FALSE}}) 
 
 # Hay NaN en los resultados de NES (enrichment score normalized to mean enrichment of random samples of the same size)
 # en algunas celulas (obs: en cada uno de ellos, pval=1). ??
@@ -135,52 +122,76 @@ es <- cells.es[GOidx,!nullcell]
 # Convertir los negativos de ES (NES) en 0s para evitar similitud en falta de enriquecimiento
 es0 <- ifelse(es < 0, 0, es)
 nes0 <- ifelse(nes < 0, 0, nes)
-
-# Filtrar ES y NES por padj: tomo -log y me fijo los significativos
 logpadj <- -log(cells.padj[GOidx,!nullcell])
-logpadj <- ifelse(es < 0, 0, logpadj)
-#logpadj <- ifelse(logpadj > -log(0.15), logpadj, 0)
-# CUALQUIER filtro para pval y padj empeora la asortatividad de toda la red y tambien por comunidad
+logpadj0 <- ifelse(es < 0, 0, logpadj)
 logp <- -log(cells.pval[GOidx,!nullcell])
-logp <- ifelse(es < 0, 0, logp)
+logp0 <- ifelse(es < 0, 0, logp)
 
+# Filtrar ES y NES por padj por los significativos?
+#logpadj <- ifelse(logpadj > -log(0.15), logpadj, 0)
+
+# CUALQUIER filtro para pval y padj empeora la asortatividad de toda la red y tambien por comunidad
+
+filteredcells
 
 # Asortatividad vectorial
-asort <- read.table("~/results/resumen_asort.txt", sep = "\t")
+asort <- read.table("results/resumen_asort.txt", sep = "\t")
 
-#Hipotesis nula: comparo con el azar cambiando el orden de las columnas
-# armo distribucion (bootstrap)
+A <- es
+assortativity_vect(induced_subgraph(knn, colnames(A)), cos_sim(A))
+
+#Hipotesis nula: comparo con azar cambiando el orden de las columnas. armo distribucion (bootstrap)
 N <- 500
 ra <- rep(0,N)
+A <- logpadj0
 for (j in 1:N){
-  azar <- nes0[,sample(ncol(nes0))]
-  colnames(azar) <- colnames(nes0)
-  sim.nes_azar <- cos_sim(azar)
+  azar <- A[,sample(ncol(A))]
+  colnames(azar) <- colnames(A)
+  sim_azar <- cos_sim(azar)
   red <- induced_subgraph(knn, colnames(azar))
-  ra[j] <- assortativity_vect(red, sim.nes_azar)
+  ra[j] <- assortativity_vect(red, sim_azar)
+  n <- 100*j/N
+  if (n%%2==0){
+    cat(paste0(n,"% "))
+  }
 }
-hist(ra, main = "Distribucion de asortatividad \n en una red al azar", xlab="r")
-abline(v=asort["sim (ES>0)","NES"],col="green")
+r1 <- assortativity_vect(induced_subgraph(knn, colnames(A)), cos_sim(A))
+hist(ra, main = "Distribucion de asortatividad \n en una red al azar", xlab="r", xlim=c(min(ra), r1))
+abline(v=r1, col="green")
 
 
 #hacer lo mismo para azar con correlacion (tarda mas)
 N <- 100
 ra.corr <- rep(0,N)
+A <- nes0
 for (j in 1:N){
-  azar <- nes0[,sample(ncol(nes0))]
-  colnames(azar) <- colnames(nes0)
-  nes_azar <- cor(azar)
+  azar <- A[,sample(ncol(A))]
+  colnames(azar) <- colnames(A)
+  cor_azar <- cor(azar)
   red <- induced_subgraph(knn, colnames(azar))
-  ra.corr[j] <- assortativity_vect(red, nes_azar)
+  ra.corr[j] <- assortativity_vect(red, cor_azar)
+  n <- 100*j/N
+  if (n%%2==0){
+    cat(paste0(n,"% "))
+  }
 }
-hist(ra.corr)#,xlim=c(0.7,0.8))
-abline(v=asort["corr (ES>0)","NES"],col="green")
+hist(ra.corr)
+abline(v=assortativity_vect(induced_subgraph(knn, colnames(A)), cor(A)),col="green")
 
+
+#
+a <- read.csv(file = "membMCL.txt",header = TRUE, sep=" ", row.names = 1)
+membMCL <- a[,1]
+names(membMCL) <- rownames(a)
+comms <- split(names(membMCL), membMCL)
+rm(a)
+#
 
 #distribucion de similitud entre pares por comunidad (comparo con azar pero sin incluir la propia comunidad)
 matriz <- cos_sim(nes0)
 N <- 100
 par(mfrow=c(3,2))
+ady <- 
 for (i in 1:6){
   cuales <- which(membMCL[lccnm]==i)
   idx <- colnames(matriz) %in% names(membMCL[lccnm])[cuales]
