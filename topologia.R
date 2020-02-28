@@ -15,7 +15,7 @@ library(Biobase)
 # Primero armo el grafo knn
 # Cell connected to its K (5-100) most similar cells, obtained using Euclidean distances on the PC-reduced expression space
 
-load("~/Documents/dimensionality/results/Asubconjunto.RData")
+load("results/Asubconjunto.RData")
 rm(pcaAsub_scaled, dataAsub)
 cells_pc <- pcaAsub$x[,1:100] # celulas (filas) representadas en los 100 primeros pcs
 cor_cells <- cor(t(cells_pc))
@@ -123,23 +123,30 @@ cat("Asortatividad de celltypes:",
 #load("~/Documents/dimensionality/results/fgseaA_res.RData") # cells.es, cells.nes, cells.padj, cells.pval, asort
 load("results/fgseaAsub100pcs500genes.RData")
 
-# NOTA: Hay NaN en los resultados de NES (enrichment score normalized to mean enrichment of random samples of the same size)
-# en 14 celulas (obs: en cada uno de ellos, pval=1). ??
-nes <- cells.nes[,!is.nan(apply(cells.nes, 2, min))] #tiro las celulas problematicas
+#Filtro por p ajustado: solo me quedo con la categoria GO si tengo más de una entrada con p menor que .05
+GOidx <- apply(cells.padj, 1, function(x){if (sum(x<0.05)>1) {1} else {0}}) 
+
+# Hay NaN en los resultados de NES (enrichment score normalized to mean enrichment of random samples of the same size)
+# en algunas celulas (obs: en cada uno de ellos, pval=1). ??
+nullcell <- is.nan(apply(cells.nes[GOidx,], 2, min))
+nes <- cells.nes[GOidx,!nullcell] #tiro las celulas problematicas
+es <- cells.es[GOidx,!nullcell]
 
 # Convertir los negativos de ES (NES) en 0s para evitar similitud en falta de enriquecimiento
-es0 <- ifelse(cells.es < 0, 0, cells.es) #tal vez conviene eliminar esas 9 celulas para que tengan la misma dimension
+es0 <- ifelse(es < 0, 0, es)
 nes0 <- ifelse(nes < 0, 0, nes)
 
 # Filtrar ES y NES por padj: tomo -log y me fijo los significativos
-logpadj <- -log(cells.padj)
-logpadj <- ifelse(cells.es < 0, 0, logpadj)
+logpadj <- -log(cells.padj[GOidx,!nullcell])
+logpadj <- ifelse(es < 0, 0, logpadj)
 #logpadj <- ifelse(logpadj > -log(0.15), logpadj, 0)
 # CUALQUIER filtro para pval y padj empeora la asortatividad de toda la red y tambien por comunidad
+logp <- -log(cells.pval[GOidx,!nullcell])
+logp <- ifelse(es < 0, 0, logp)
 
 
 # Asortatividad vectorial
-asort <- read.table("results/resumen_asort.txt", sep = "\t")
+asort <- read.table("~/results/resumen_asort.txt", sep = "\t")
 
 #Hipotesis nula: comparo con el azar cambiando el orden de las columnas
 # armo distribucion (bootstrap)
@@ -152,7 +159,7 @@ for (j in 1:N){
   red <- induced_subgraph(knn, colnames(azar))
   ra[j] <- assortativity_vect(red, sim.nes_azar)
 }
-hist(ra,xlim=c(0.7,0.8), main = "Distribucion de asortatividad \n en una red al azar", xlab="r")
+hist(ra, main = "Distribucion de asortatividad \n en una red al azar", xlab="r")
 abline(v=asort["sim (ES>0)","NES"],col="green")
 
 
