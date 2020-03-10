@@ -1,5 +1,72 @@
-#Analisis de comunidades: participacion de los nodos, coreness de enlaces, bordes de clusters
+#Analisis de comunidades: similitud, participacion de los nodos, coreness de enlaces, bordes de clusters
 
+Ngen <- dim(dataAsub)[1]
+enlaces <- as_edgelist(knn.lcc)
+#cuantos genes tienen 0 en ambos nodos del enlace
+a <- apply(enlaces, 1, function(x){sum((dataAsub[,x[1]]+dataAsub[,x[2]])==0)})
+dropoutperc <- a/Ngen
+
+similitud <- cos_sim(dataAsub)
+similitudpares <- apply(enlaces, 1, function(x){similitud[x[1],x[2]]})
+par(mfrow=c(1,1))
+plot(similitudpares, dropoutperc)
+
+intracom <- membMCL[enlaces[,1]]
+idx <- apply(enlaces, 1, function(x){membMCL[x[1]]!=membMCL[x[2]]})
+intracom[idx] <- 0
+intracom[idx] <- max(intracom)+1
+colores <- rainbow(length(unique(intracom))-1)
+colores <- c(colores, 'black')
+
+plot(similitudpares, dropoutperc, col=colores[intracom], 
+     main="Similitud entre pares de nodos enlazados vs \n porcentaje de dropouts en ambos nodos del enlace", 
+     xlab="similitud", ylab="porcentaje de dropouts")
+legend('bottomleft', legend=c(seq(1:18),'dif'), col=colores, pch=1, cex=0.7)
+
+#por comunidad
+xs <- par("usr")[1:2]
+ys <- par("usr")[3:4]
+
+par(mfrow=c(2,3))
+for (i in 1:12){
+  idx1 <- apply(enlaces, 1, function(x){if (membMCL[x[1]]==i | membMCL[x[2]]==i){TRUE} else {FALSE}})
+  plot(similitudpares[idx1], dropoutperc[idx1], col=colores[intracom[idx1]], main=paste('Comunidad',i), xlim=xs, ylim=ys,
+       xlab="similitud", ylab="porcentaje dropout")
+}
+
+
+#---- REVISAR A PARTIR DE ACA
+#distribucion de similitud entre pares por comunidad (comparo con azar pero sin incluir la propia comunidad)
+ady <- as_adjacency_matrix(knn, sparse = FALSE)
+matriz <- cos_sim(nes0)
+N <- 100
+par(mfrow=c(3,2))
+
+for (i in 1:6){
+  icomm <- which(membMCL[lccnm]==i)
+  idx <- colnames(matriz) %in% names(membMCL[lccnm])[icomm]
+  A <- ady[idx,idx]
+  enlacesvect <- A[upper.tri(A)]
+  enlacesvect <- ifelse(enlacesvect, TRUE, FALSE)
+  X <- matriz[idx,idx]
+  similvect <- X[upper.tri(X)]
+  
+  hist(similvect[enlacesvect], freq=FALSE,
+       main=paste("C",i,"tamaño",table(membMCL[lccnm])[i]), xlab = "", ylim=c(0,10))
+  
+  npar <- (length(X)-dim(X)[1])/2
+  
+  X <- matriz[!idx,!idx]
+  pares <- X[upper.tri(X, diag = FALSE)]
+  A <- matrix(0, nrow = N, ncol = npar)
+  for (j in 1:dim(A)[1]){
+    A[j,] <- sample(pares, npar)
+  }
+  hist(A, freq=FALSE, col=rgb(1,0,0,0.5), add=TRUE)
+}
+
+
+#----
 # Asortatividad vectorial por comunidad
 matriz <- cos_sim(nes0)
 

@@ -66,6 +66,15 @@ membMCL<-as.numeric(unlist(a))
 names(membMCL)<-names(a) #membMCL es un vector de genes con membership
 
 rm(df, outfile, cmd, a, lines, pr, pw)
+
+#
+a <- read.csv(file = "membMCL.txt",header = TRUE, sep=" ", row.names = 1)
+membMCL <- a[,1]
+names(membMCL) <- rownames(a)
+comms <- split(names(membMCL), membMCL)
+rm(a)
+#
+
 #----
 # me tengo que quedar con el largest connected component ahora o entre knn y jaccard. miro que coincidan:
 components(knn)$csize
@@ -127,17 +136,12 @@ logpadj0 <- ifelse(es < 0, 0, logpadj)
 logp <- -log(cells.pval[GOidx,!nullcell])
 logp0 <- ifelse(es < 0, 0, logp)
 
-# Filtrar ES y NES por padj por los significativos?
-#logpadj <- ifelse(logpadj > -log(0.15), logpadj, 0)
-
-# CUALQUIER filtro para pval y padj empeora la asortatividad de toda la red y tambien por comunidad
-
-filteredcells
+# Filtrar ES y NES por padj significativos? CUALQUIER filtro empeora la asortatividad (tambien por comunidad)
 
 # Asortatividad vectorial
-asort <- read.table("results/resumen_asort.txt", sep = "\t")
+asort <- read.csv("results/resumen_asort.txt", row.names = 1)
 
-A <- es
+A <- es0
 assortativity_vect(induced_subgraph(knn, colnames(A)), cos_sim(A))
 
 #Hipotesis nula: comparo con azar cambiando el orden de las columnas. armo distribucion (bootstrap)
@@ -178,69 +182,15 @@ for (j in 1:N){
 hist(ra.corr)
 abline(v=assortativity_vect(induced_subgraph(knn, colnames(A)), cor(A)),col="green")
 
-
-#
-a <- read.csv(file = "membMCL.txt",header = TRUE, sep=" ", row.names = 1)
-membMCL <- a[,1]
-names(membMCL) <- rownames(a)
-comms <- split(names(membMCL), membMCL)
-rm(a)
-#
-
-#distribucion de similitud entre pares por comunidad (comparo con azar pero sin incluir la propia comunidad)
+#distribución de similitud en enlaces vs en el resto de la red
+ady <- as_adjacency_matrix(knn, sparse = FALSE)
+enlacesvect <- ady[upper.tri(ady)]
+enlacesvect <- ifelse(enlacesvect, TRUE, FALSE)
 matriz <- cos_sim(nes0)
-N <- 100
-par(mfrow=c(3,2))
-ady <- 
-for (i in 1:6){
-  cuales <- which(membMCL[lccnm]==i)
-  idx <- colnames(matriz) %in% names(membMCL[lccnm])[cuales]
-  X <- matriz[idx,idx]
-  hist(X[upper.tri(X, diag = FALSE)], freq=FALSE,
-       main=paste("C",i,"tamaÃ±o",table(membMCL[lccnm])[i]), xlab = "", ylim=c(0,10))
-  
-  npar <- (length(X)-dim(X)[1])/2
-  
-  X <- matriz[!idx,!idx]
-  pares <- X[upper.tri(X, diag = FALSE)]
-  A <- matrix(0, nrow = N, ncol = npar)
-  for (j in 1:dim(A)[1]){
-    A[j,] <- sample(pares, npar)
-  }
-  hist(A, freq=FALSE, col=rgb(1,0,0,0.5), add=TRUE)
-}
-
-#repito lo mismo, pero para pares que pertenezcan a distintas comunidades, sea cual sea
-m <- membMCL[rownames(matriz)[rownames(matriz) %in% names(membMCL)]]
-ccomp <- matrix(rep(0, length(m)^2), nrow=length(m), ncol=length(m),
-               dimnames = list(names(m),names(m)))
-for (i in unique(m)){
-    nombres <- names(m)[m==i]
-    ccomp[nombres,nombres] <- 1
-}
-rm(i,nombres)
-idx <- ccomp[upper.tri(ccomp, diag = FALSE)]
-X <- matriz[rownames(ccomp),colnames(ccomp)]
-pares <- X[upper.tri(X, diag = FALSE)]
-pares <- pares[!idx]
-
-par(mfrow=c(3,2))
-for (i in 1:6){
-  cuales <- which(membMCL[lccnm]==i)
-  idx <- colnames(matriz) %in% names(membMCL[lccnm])[cuales]
-  X <- matriz[idx,idx]
-  hist(X[upper.tri(X, diag = FALSE)], freq=FALSE,
-       main=paste("C",i,"tamaÃ±o",table(membMCL[lccnm])[i]), xlab = "", ylim=c(0,10))
-  
-  npar <- (length(X)-dim(X)[1])/2
-  
-  A <- matrix(0, nrow = N, ncol = npar)
-  for (j in 1:dim(A)[1]){
-    A[j,] <- sample(pares, npar)
-  }
-  hist(A, freq=FALSE, col=rgb(1,0,0,0.5), add=TRUE)
-}
-
+similvect <- matriz[upper.tri(matriz)]
+hist(similvect[enlacesvect], freq=F, col=rgb(0,1,0,0.4), xlim=c(0,1), 
+     main="Distribución de similitud de NES>0", xlab="similitud")
+hist(similvect[!enlacesvect], freq=F, add=T, col=rgb(0,0,1,0.4)) # el total es casi igual a este
 
 # silhouette
 library(cluster)
@@ -285,34 +235,3 @@ S_cols[cntg_uni==0] <- 0
 N <- dim(cntg_uni)[1]
 S_col_max <- -log(1/N)
 
-#----
-Ngen <- dim(dataAsub)[1]
-enlaces <- as_edgelist(knn.lcc)
-a <- apply(enlaces, 1, function(x){sum((dataAsub[,x[1]]+dataAsub[,x[2]])==0)})
-dropoutperc <- a/Ngen
-
-similitud <- cos_sim(dataAsub)
-similitudpares <- apply(enlaces, 1, function(x){similitud[x[1],x[2]]})
-plot(similitudpares, dropoutperc)
-
-intracom <- membMCL[enlaces[,1]]
-idx <- apply(enlaces, 1, function(x){membMCL[x[1]]!=membMCL[x[2]]})
-intracom[idx] <- 0
-intracom[idx] <- max(intracom)+1
-colores <- rainbow(length(unique(intracom))-1)
-colores <- c(colores, 'black')
-
-plot(similitudpares, dropoutperc, col=colores[intracom])
-legend('bottomleft', legend=c(seq(1:18),'dif'), col=colores, pch=1, cex=0.7)
-
-#por comunidad
-xs <- par("usr")[1:2]
-ys <- par("usr")[3:4]
-
-par(mfrow=c(2,3))
-for (i in 1:12){
-  idx1 <- apply(enlaces, 1, function(x){if (membMCL[x[1]]==i | membMCL[x[2]]==i){TRUE} else {FALSE}})
-  plot(similitudpares[idx1], dropoutperc[idx1], col=colores[intracom[idx1]], main=paste('Comunidad',i), xlim=xs, ylim=ys)
-}
-
-# calcular similitud pero solo con las partes no nulas del vector?
