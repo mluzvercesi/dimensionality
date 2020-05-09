@@ -1,9 +1,18 @@
 #Analisis de comunidades: similitud, participacion de los nodos, coreness de enlaces, bordes de clusters
 
+#grafo simplificado de comunidades como nodos
+gMCL <- grafosimple(knn, membMCL, plt='lcc')
+
+
+#COMPARAR SIMILITUD ENTRE COMUNIDADES "LEJANAS" por ej: 1-3 1-6 2-6 3-4
+
+
+# similitud vs dropouts----
 Ngen <- dim(dataAsub)[1]
-enlaces <- as_edgelist(knn.lcc)
+enlaces <- as_edgelist(lcc)
 #cuantos genes tienen 0 en ambos nodos del enlace
-a <- apply(enlaces, 1, function(x){sum((dataAsub[,x[1]]+dataAsub[,x[2]])==0)})
+X <- dataAsub==0
+a <- apply(enlaces, 1, function(x){sum(X[,x[1]]*X[,x[2]])})
 dropoutperc <- a/Ngen
 
 similitud <- cos_sim(dataAsub)
@@ -13,15 +22,15 @@ plot(similitudpares, dropoutperc)
 
 intracom <- membMCL[enlaces[,1]]
 idx <- apply(enlaces, 1, function(x){membMCL[x[1]]!=membMCL[x[2]]})
-intracom[idx] <- 0
-intracom[idx] <- max(intracom)+1
+#intracom[idx] <- 0
+intracom[idx] <- max(intracom)+1 
 colores <- rainbow(length(unique(intracom))-1)
 colores <- c(colores, 'black')
 
 plot(similitudpares, dropoutperc, col=colores[intracom], 
      main="Similitud entre pares de nodos enlazados vs \n porcentaje de dropouts en ambos nodos del enlace", 
      xlab="similitud", ylab="porcentaje de dropouts")
-legend('bottomleft', legend=c(seq(1:18),'dif'), col=colores, pch=1, cex=0.7)
+legend('bottomleft', legend=c(seq(1:18),'dif'), col=colores, pch=1, cex=0.7, ncol = 2)
 
 #por comunidad
 xs <- par("usr")[1:2]
@@ -35,6 +44,137 @@ for (i in 1:12){
 }
 
 
+# Asortatividad vectorial por comunidad----
+matriz <- cos_sim(nes0)
+
+for (i in 1:length(comms)){
+  nombres <- comms[[i]]
+  nombres <- nombres[nombres %in% colnames(matriz)]
+  red <- induced_subgraph(knn, nombres)
+  r <- assortativity_vect(red, matriz[nombres,nombres])
+  cat("r = ", r, "Comunidad", i, "tama�o", table(membMCL)[i], "\n")
+}
+
+for (i in 1:length(unique(celltypes))){
+  nombres <- names(which(celltypes[lccnm]==unique(celltypes)[i]))
+  nombres <- nombres[nombres %in% colnames(matriz)]
+  red <- induced_subgraph(knn, nombres)
+  r <- assortativity_vect(red, matriz[nombres,nombres])
+  rhoch[i] <- r
+  cat("r = ", r, "Comunidad", unique(celltypes)[i], "tama�o", table(celltypes[lccnm])[i],"\n")
+}
+
+#----
+lccnm <- vertex_attr(lcc, name = "name") #todos estan en lcc y en nes0
+
+edges <- as_edgelist(lcc, names = TRUE)
+edgesim <- apply(edges, 1, function(x){matriz[x[1],x[2]]})
+edgecoms <- apply(edges,2,function(x){membMCL[x]})
+
+interior_idx <- edgecoms[,1]==edgecoms[,2]
+
+#comparar enlaces de borde vs internos
+hist(edgesim[interior_idx], freq=FALSE, main= "Distribucion de similitud de NES>0", col=rgb(0,0.6,0.4,0.5), xlab="similitud")
+hist(edgesim[!interior_idx], freq=FALSE, add=TRUE, col=rgb(0,0,0.5,0.5))
+legend("topleft", legend=c("interior","bordes"), fill=c(rgb(0,0.6,0.4,0.5), rgb(0,0,0.5,0.5)))
+
+ccint <- sort(unique(as.vector(edgecoms[interior_idx,]))) #comunidades con enlaces internos
+
+
+#Centralidad de los enlaces
+kcoreness <- coreness(lcc)
+enlaces_k <- enlaces
+enlaces_k[,1] <- kcoreness[enlaces[,1]]
+enlaces_k[,2] <- kcoreness[enlaces[,2]]
+enlaces_k <- matrix(as.integer(enlaces_k), nrow=dim(enlaces_k)[1], ncol=dim(enlaces_k)[2])
+
+edgecore <- apply(enlaces_k, 1, min)
+
+mean_edgesim <- rep(0, length(unique(edgecore)))
+for (i in 1:length(mean_edgesim)){
+  mean_edgesim[i] <- mean(edgesim[edgecore==unique(edgecore)[i]])
+}
+par(mfrow=c(1,1))
+plot(edgecore, edgesim, xlab="coreness de enlace", ylab="similitud de enlace")
+points(unique(edgecore), mean_edgesim, col="green", pch=16)
+
+corelist <- sort(unique(edgecore), decreasing = TRUE)
+#grafo donde solo quedan los enlaces con coreness mayor a cierto umbral
+g <- graph_from_edgelist(enlaces[edgecore>corelist[7],], directed = FALSE)
+is.connected(g)
+alphavec <- kcoreness[V(g)]/max(kcoreness[V(g)])
+plot.igraph(g, vertex.label=NA, vertex.size=5, edge.width=0.5,
+            vertex.color = rgb(0,1,0,alphavec))
+
+
+#por comunidad
+lista <- comms[as.character(ccint)]
+colores <- rainbow(length(lista))
+for (i in 1:length(lista)){
+  nombres <- lista[[i]]
+  nombres <- nombres[nombres %in% colnames(matriz)]
+  g <- induced_subgraph(lcc, nombres)
+  e <- as_edgelist(g)
+  kcore <- coreness(g)
+  enlaces_k <- e
+  enlaces_k[,1] <- kcore[e[,1]]
+  enlaces_k[,2] <- kcore[e[,2]]
+  enlaces_k <- matrix(as.integer(enlaces_k), nrow=dim(enlaces_k)[1], ncol=dim(enlaces_k)[2])
+  
+  ecore <- apply(enlaces_k, 1, min)
+  
+  edgesim <- apply(e, 1, function(x){matriz[x[1],x[2]]})
+  mean_edgesim <- rep(0, length(unique(ecore)))
+  for (j in 1:length(mean_edgesim)){
+    mean_edgesim[j] <- mean(edgesim[ecore==unique(ecore)[j]])
+  }
+  png(filename=paste0("fig/corenesscomm",names(lista)[i],".png"), width = 1600, height = 600, res = 150)
+  par(mfrow=c(1,2))
+  plot(ecore, edgesim, xlab="coreness de enlace", ylab="similitud de enlace", xlim=c(0,24),
+       main=paste('Comunidad', names(lista)[i]))
+  
+  clr <- col2rgb(colores[i])
+  points(unique(ecore), mean_edgesim, col=rgb(t(clr), maxColorValue = 255), pch=16)
+  
+  corelist <- sort(unique(ecore), decreasing = TRUE)
+  #grafo donde solo quedan los enlaces con coreness mayor a cierto umbral
+  #g1 <- graph_from_edgelist(e[ecore>corelist[7],], directed = FALSE)
+  #is.connected(g1)
+  alphav <- kcore[V(g)]/max(kcore[V(g)])
+  plot.igraph(g, vertex.label=NA, vertex.size=5, edge.width=0.5,
+              vertex.color = rgb(t(clr)/255, alpha = alphav), cex.main=0.5, 
+              main = paste(vcount(g), 'nodos y', ecount(g), 'enlaces'))
+  dev.off()
+}
+
+listasims <- lista
+listacores <- lista
+for (i in 1:length(lista)){
+  nombres <- lista[[i]]
+  nombres <- nombres[nombres %in% colnames(matriz)]
+  g <- induced_subgraph(lcc, nombres)
+  e <- as_edgelist(g)
+  kcore <- coreness(g)
+  enlaces_k <- e
+  enlaces_k[,1] <- kcore[e[,1]]
+  enlaces_k[,2] <- kcore[e[,2]]
+  enlaces_k <- matrix(as.integer(enlaces_k), nrow=dim(enlaces_k)[1], ncol=dim(enlaces_k)[2])
+  
+  listacores[[i]] <- apply(enlaces_k, 1, min)
+  listasims[[i]] <- apply(e, 1, function(x){matriz[x[1],x[2]]})
+}
+
+plot(listacores[[1]], listasims[[1]], col=colores[1], xlim=c(1,24), ylim=c(0.1,1), 
+     xlab='coreness de enlace', ylab='similitud de enlace')
+for (i in 2:length(listacores)){
+  points(listacores[[i]], listasims[[i]], col=colores[i])
+}
+
+
+# atributo para enlaces: vecinos en comun
+frac_comun <- apply(enlaces, 1, function(x){vecinoscomun(lcc,x) })
+
+
 #---- REVISAR A PARTIR DE ACA
 #distribucion de similitud entre pares por comunidad (comparo con azar pero sin incluir la propia comunidad)
 ady <- as_adjacency_matrix(knn, sparse = FALSE)
@@ -42,7 +182,7 @@ matriz <- cos_sim(nes0)
 N <- 100
 par(mfrow=c(3,2))
 
-for (i in 1:6){
+for (i in 1:12){
   icomm <- which(membMCL[lccnm]==i)
   idx <- colnames(matriz) %in% names(membMCL[lccnm])[icomm]
   A <- ady[idx,idx]
@@ -51,8 +191,8 @@ for (i in 1:6){
   X <- matriz[idx,idx]
   similvect <- X[upper.tri(X)]
   
-  hist(similvect[enlacesvect], freq=FALSE,
-       main=paste("C",i,"tama�o",table(membMCL[lccnm])[i]), xlab = "", ylim=c(0,10))
+  hist(similvect[enlacesvect], freq=FALSE, col=rgb(0,1,0,0.4), xlim=c(0,1), 
+       main=paste("C",i,"tama�o",table(membMCL[lccnm])[i]), xlab = "")
   
   npar <- (length(X)-dim(X)[1])/2
   
@@ -62,156 +202,15 @@ for (i in 1:6){
   for (j in 1:dim(A)[1]){
     A[j,] <- sample(pares, npar)
   }
-  hist(A, freq=FALSE, col=rgb(1,0,0,0.5), add=TRUE)
+  hist(A, freq=FALSE, col=rgb(0,0,1,0.5), add=TRUE)
 }
-
-
-#----
-# Asortatividad vectorial por comunidad
-matriz <- cos_sim(nes0)
-
-for (i in 1:length(comms)){
-  nombres <- comms[[i]]
-  nombres <- nombres[nombres %in% colnames(matriz)]
-  red <- induced_subgraph(knn, nombres)
-  r <- assortativity_vect(red, matriz[nombres,nombres])
-  cat("r = ", r, "Comunidad", i, "tamaño", table(membMCL)[i], "\n")
-}
-
-for (i in 1:length(unique(celltypes))){
-  nombres <- names(which(celltypes[lccnm]==unique(celltypes)[i]))
-  nombres <- nombres[nombres %in% colnames(matriz)]
-  red <- induced_subgraph(knn, nombres)
-  r <- assortativity_vect(red, matriz[nombres,nombres])
-  cat("r = ", r, "Comunidad", unique(celltypes)[i], "tamaño", table(celltypes[lccnm])[i],"\n")
-}
-
-
-enlaces <- as_edgelist(knn.lcc, names = TRUE)
-enlacescoms <- apply(enlaces,2,function(x){membMCL[x]})
-
-nodos0 <- colnames(matriz)[colnames(matriz) %in% vertex_attr(knn.lcc, name = "name")] #nodos en nes0 y en el lcc
-knn.lcc0 <- induced_subgraph(knn.lcc, nodos0)
-
-edges <- as_edgelist(knn.lcc0, names = TRUE)
-edgesim <- apply(edges, 1, function(x){matriz[x[1],x[2]]})
-edgecoms <- apply(edges,2,function(x){membMCL[x]})
-
-bordes <- edges[edgecoms[,1]!=edgecoms[,2],]
-bordesim <- apply(bordes, 1, function(x){matriz[x[1],x[2]]})
-
-interior <- edges[edgecoms[,1]==edgecoms[,2],]
-interiorsim <- apply(interior, 1, function(x){matriz[x[1],x[2]]})
-
-
-hist(matriz[upper.tri(matriz, diag=FALSE)], freq=FALSE, main="similitud en toda la red", xlim=c(0.5,1), ylim=c(0,12))
-hist(bordesim, freq=FALSE, add=TRUE, col=rgb(0,0.6,0.5,0.5))
-
-hist(edgesim, freq=FALSE, main= "similitud entre nodos enlazados", xlim=c(0.5,1), ylim=c(0,12), col=rgb(0,0,0.5,0.5))
-hist(bordesim, freq=FALSE, add=TRUE, col=rgb(0,0.6,0.5,0.5))
-
-#por comunidad
-bordescoms <- edgecoms[edgecoms[,1]!=edgecoms[,2],]
-borde_por_com <- rep( list(list()), length(unique(bordescoms[,1])))
-for (c in sort(unique(bordescoms[,1]))){
-  idx <- which(apply(bordescoms,1,function(x){if (x[1]==c|x[2]==c){1} else {0}})==1)
-  borde_por_com[[c]] <- apply(bordes[idx,], 1, function(x){matriz[x[1],x[2]]})
-  hist(edgesim, freq=FALSE, main= paste("todos los bordes vs bordes de comunidad \n Comunidad",c, "tamaño", table(membMCL)[c]),
-       xlim=c(0.5,1), ylim=c(0,12), col=rgb(0,0,0.5,0.5))
-  hist(borde_por_com[[c]], freq=FALSE, add=TRUE, col=rgb(0,0.6,0.5,0.5))
-}
-
-#comparar enlaces de borde vs internos
-interiorcoms <- edgecoms[edgecoms[,1]==edgecoms[,2],]
-int_por_com <- rep( list(list()), length(unique(interiorcoms[,1])))
-for (c in sort(unique(interiorcoms[,1]))){
-  idx <- which(interiorcoms[,1]==c)
-  int_por_com[[c]] <- apply(interior[idx,], 1, function(x){matriz[x[1],x[2]]})
-  hist(int_por_com[[c]], freq=FALSE, main=paste("enlaces internos vs bordes por comunidad \n Comunidad",c, "tamaño", table(membMCL)[c]),
-       xlim=c(0.5,1), ylim=c(0,12), col=rgb(0,0,0.5,0.5))
-  hist(borde_por_com[[c]], freq=FALSE, add=TRUE, col=rgb(0,0.6,0.5,0.5))
-}
-
-#comparacion
-options(bitmapType="cairo")
-for (c in sort(unique(bordescoms[,1]))){
-  png(paste0("fig/coms_mcl_",c,".png"), width = 988, height = 494)
-  par(mfrow=c(1,2))
-  hist(edgesim, freq=FALSE, main= paste("todos los bordes vs bordes de comunidad \n Comunidad",c, "tamaño", table(membMCL)[c]),
-       xlim=c(0.5,1), ylim=c(0,12), col=rgb(0.8,0.1,0,0.5))
-  hist(borde_por_com[[c]], freq=FALSE, add=TRUE, col=rgb(0,0.6,0.5,0.5))
-  hist(int_por_com[[c]], freq=FALSE, main=paste("enlaces internos vs bordes por comunidad \n Comunidad",c, "tamaño", table(membMCL)[c]),
-       xlim=c(0.5,1), ylim=c(0,12), col=rgb(0,0,0.5,0.5))
-  hist(borde_por_com[[c]], freq=FALSE, add=TRUE, col=rgb(0,0.6,0.5,0.5))
-  dev.off()
-}
-
-
-boxplot.default(c(borde_por_com[1:13], int_por_com[1:13]), at=c(seq(1,26,2),seq(2,26,2)), col=c(rep("orange",13),rep("cyan",13)))
-legend('bottomright', legend = c('borde','interior'), col = c('orange', 'cyan'), pch=15)
-
-
-# atributo para enlaces: vecinos en comun
-frac_comun <- apply(enlaces, 1, function(x){vecinoscomun(knn.lcc,x) })
-
-#Centralidad de los enlaces
-kcoreness <- coreness(knn.lcc)
-enlaces_k <- enlaces
-enlaces_k[,1] <- kcoreness[enlaces[,1]]
-enlaces_k[,2] <- kcoreness[enlaces[,2]]
-enlaces_k <- matrix(as.integer(enlaces_k), nrow=dim(enlaces_k)[1], ncol=dim(enlaces_k)[2])
-
-edge_core <- apply(enlaces_k, 1, min)
-
-sim.nes <- cos_sim(nes0)
-knn.nes <- delete_vertices(knn.lcc, v=colnames(cells.nes)[is.nan(apply(cells.nes, 2, min))])
-e <- as_edgelist(knn.nes, names = TRUE)
-edge_sim <- apply(e, 1, function(x){ sim.nes[x[1], x[2]] })
-
-mean_edge_sim <- rep(0, length(unique(edge_core)))
-for (i in 1:length(unique(edge_core))){
-  mean_edge_sim[i] <- edge_sim[edge_core=unique(edge_core)[i]]
-}
-
-par(mfrow=c(1,1))
-plot(edge_core, edge_sim)
-points(unique(edge_core), mean_edge_sim, col="green", pch=16)
-
-corelist <- sort(unique(edge_core), decreasing = TRUE)
-
-g <- graph_from_edgelist(enlaces[edge_core>corelist[7],], directed = FALSE)
-is.connected(g)
-alphavec <- kcoreness[V(g)]/max(kcoreness[V(g)])
-plot.igraph(g, vertex.label=NA, vertex.size=5, edge.width=0.5,
-            vertex.color = rgb(0,1,0,alphavec))
-
-#-----
-#grafo de comunidades como nodos
-b <- apply(enlacescoms, 1, sort)
-g <- make_graph(as.vector(b), directed = FALSE)
-
-E(g)$weight <- 1
-g2 <- simplify(g, edge.attr.comb=list(weight="sum"), remove.loops = FALSE)
-
-nodesizes <- as.integer(table(membMCL)[1:vcount(g2)])
-g2 <- set_vertex_attr(g2, "size", value=2*log(nodesizes))
-
-#veo las comunidades con loops
-E(g2)[which_loop(g2)]
-loopweights <- get.edge.attribute(g2, name = "weight", index = which(which_loop(g2)))
-
-gMCL <- simplify(g2)
-plot(gMCL)
-
-#COMPARAR SIMILITUD ENTRE COMUNIDADES "LEJANAS"
-
 
 
 #------------------------------------------------------------------------
 
 #para participacion y z-score (calculate_toproles.R)
 membership <- membMCL[lccnm]
-g_users <- knn.lcc
+g_users <- lcc
 
 nodos_perif <- unique(as.list(enlaces[enlacescoms[,1]!=enlacescoms[,2],]))
 n <- unique(as.list(enlaces[enlacescoms[,1]==enlacescoms[,2],]))

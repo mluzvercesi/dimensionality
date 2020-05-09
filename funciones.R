@@ -18,6 +18,60 @@ vecinoscomun <- function(g, par){
   }
 }
 
+grafosimple <- function(g, memb, plt = c('none', 'lcc', 'all')){
+  # Funcion que toma un grafo y una particion, y genera un nuevo grafo
+  # mas chico donde cada nodo es una comunidad, con enlaces pesados no dirigidos
+  plt <- match.arg(plt)
+  
+  if (vcount(g)!=length(memb)){
+    interseccion <- intersect(names(memb), vertex_attr(g, name='name'))
+    stopifnot(length(interseccion)>0)
+    g <- induced_subgraph(g, interseccion)
+    memb <- memb[interseccion]
+    print('Se utilizo el subconjunto interseccion')
+  }
+  
+  enlaces <- as_edgelist(g)
+  ecoms <- apply(enlaces, 2, function(x){memb[x]})
+  G <- graph_from_edgelist(ecoms, directed = FALSE)
+  E(G)$weight <- 1
+  G <- simplify(G, edge.attr.comb=list(weight="sum"), remove.loops=FALSE)
+  
+  #la transparencia es la cantidad de loops
+  alphas <- rep(0, vcount(G))
+  idx <- as_edgelist(G)[which_loop(G),1]
+  alphas[idx] <- log(E(G)$weight[which_loop(G)]+1)
+  alphas <- alphas/max(alphas)
+  V(G)$alpha <- alphas
+  V(G)$size <- as.numeric(table(memb))
+  
+  if (plt=='all'){
+    plot(
+      simplify(G, remove.loops=TRUE), # para que no grafique loops
+      vertex.size     = log(V(G)$size, base=min(V(G)$size)), # el tamanio de la comunidad
+      vertex.label    = NA,
+      edge.arrow.size = .25,
+      vertex.color    = rgb(0,.5,.5, alpha = V(G)$alpha)
+    )
+  } else if (plt=='lcc'){
+    lcc <- decompose(G, max.comps = 1, min.vertices = 2)
+    if (length(lcc)==0){
+      print('No hay lcc con mas de un nodo')
+    }else{
+      lcc <- lcc[[1]]
+      plot(
+        simplify(lcc, remove.loops=TRUE),
+        vertex.size     = log(V(lcc)$size, base=min(V(lcc)$size)), # el tamanio de la comunidad
+        vertex.label    = NA,
+        edge.arrow.size = .25,
+        vertex.color    = rgb(0,.5,.5, alpha = V(lcc)$alpha)
+      )
+    } #end if hay lcc
+  } #end if plt='lcc'
+  
+  return(G)
+}
+
 assortativity_vect <- function(network, X){
   # network puede ser la red o la matriz de adyacencia
   # X matriz de similitud o correlacion entre propiedades vectoriales de los nodos
@@ -158,7 +212,7 @@ genes_by_weight <- function(results,ncomp=1,retw=FALSE){
   indices <- order(weights,decreasing = TRUE) # orden de maximas proyecciones
   
   if (retw){
-    nombre <- list("genes"=rownames(results$rotation)[indices],"weights"=weights[indices])
+    nombre <- weights[indices]
   }else{
     nombre <- rownames(results$rotation)[indices]
   }
@@ -215,6 +269,7 @@ computarIC <- function(OrgDb, keytype = "ENTREZID", ont) {
   IC <- -log(p)
   return(IC)
 }
+
 
 #Func para GO------------------------------------------------------------
 sym2eg <- function(genes,inverse=FALSE){

@@ -1,23 +1,19 @@
-source("~/Documents/dimensionality/funciones.R")
-#------------------------------------------------------------------------
 load("results/Apca.RData")
 load("results/Asubconjunto.RData")
 
 library(GO.db)
 library(GOstats)
 library(org.Mm.eg.db)
-require(gplots) # para tener heatmap con referencias
-#------------------------------------------------------------------------
+
 # para ver que tiene el paquete de Mm
 ls("package:org.Mm.eg.db")
 columns(org.Mm.eg.db)
 get("17708", org.Mm.egGENENAME) # para un solo gen, por ejemplo
 
-#---------
+#----
 #podria ser util para corregir algunos errores en los nombres:
 a<-read.table("Neurogenesis/Linnarson_NatNeuro2018/GSE95315/GSE95315_metadata.txt",sep="\t",header=TRUE)
 table(a[,2])
-
 a<-as.list(org.Mm.egALIAS2EG)
 as.numeric(names(table(grep("Rik",names(a)))))
 
@@ -34,13 +30,14 @@ if (sum(is.na(gene_universe_id))/length(gene_universe_id) > 0.1){
 
 hgCutoff <- 1 #usar cutoff 1 para que devuelva todos los pvalues
 
-nmax <- 100 #cantidad de pcs que considera
+nmaxpcs <- 100 #cantidad de pcs que considera
+ngenes <- 500 #genes por pc
 hgs <- rep(NULL,8)
 
 start_time <- Sys.time()
-for (i in 51:100){
+for (i in 1:nmaxpcs){
   orderedgenes <- genes_by_weight(pca,ncomp=i)
-  selected_genes <- orderedgenes[1:500]
+  selected_genes <- orderedgenes[1:ngenes]
   selected_genes_id <- sym2eg(selected_genes)
   if (sum(is.na(selected_genes_id))/length(selected_genes_id)>0.1){
     cat(sprintf("Fraccion de genes sin mapear: %.2f", sum(is.na(selected_genes_id))/length(selected_genes_id)))
@@ -74,50 +71,40 @@ for (i in 51:100){
 }#end loop i (pcs)
 #colnames(hgs)[8] <- "PC"
 end_time <- Sys.time()
-cat(sprintf("Tardó %.2f minutos\n", end_time-start_time))
+print(end_time-start_time)
 rm(i, hg, hyperg_df, index, hyperg_results, params, selected_genes_id, selected_genes, orderedgenes,end_time, start_time)
 
 # REPRESENTACION VISUAL--------------------------------------------------
+require(gplots)
 load("results/hgsAsub500genes.RData") #hgs, gopcs
+load("results/hgsAsub200genes.RData")
 
-nervdev_offs <- get("GO:0007399",GOBPOFFSPRING) # nervous system development (incluye neurogen)
-#neuro_offs <- get("GO:0022008",GOBPOFFSPRING) # neurogenesis
+nervdev_gos <- get("GO:0007399",GOBPOFFSPRING) # nervous system development (incluye neurogen)
+#neuro_gos <- get("GO:0022008",GOBPOFFSPRING) # neurogenesis
 
-cat <- unique(hgs[,"GOBPID"]) #categorias GO
-cols <- unique(hgs[,"PC"])
-Npcs <- length(cols)
-gopcs <- matrix(0L, nrow = length(cat), ncol = Npcs+1)
-#creo que lo correcto seria una matriz de max(hgs[,"Pvalue"]), por si hay un pvalue que sea exactamente 0? (puede?)
-rownames(gopcs) <- cat
-colnames(gopcs) <- c(cols,"Neuro")
-rm(cat)
+gonms <- unique(hgs[,"GOBPID"]) #categorias GO
+pcnms <- unique(hgs[,"PC"])
+gopcs <- matrix(1L, nrow = length(gonms), ncol = length(pcnms)+1)
+rownames(gopcs) <- gonms
+colnames(gopcs) <- c(pcnms,"Neuro")
 
-for (i in cols){
-  # indices (booleanos) de las categorias que tienen PC=i
-  ind_cat <- rownames(gopcs) %in% hgs[hgs[,"PC"]==i,"GOBPID"]
-  # indices (con orden)
-  ind_pval <- match(rownames(gopcs)[ind_cat],hgs[hgs[,"PC"]==i,"GOBPID"])
+for (i in pcnms){
+  # submatriz con PC=i
+  X <- hgs[hgs[,"PC"]==i,]
   # reemplazo de pvalues
-  gopcs[ind_cat,i] <- hgs[hgs[,"PC"]==i,"Pvalue"][ind_pval]
+  gopcs[X[,"GOBPID"],as.character(i)] <- X[,"Pvalue"]
 }
-rm(i,cols,ind_cat,ind_pval,Npcs)
-
-ind_nerv <- rownames(gopcs) %in% nervdev_offs
-gopcs[ind_nerv,"Neuro"] <- .001
-#ind_neuro <- rownames(gopcs) %in% neuro_offs
-#gopcs[ind_neuro,"Neuro"] <- .001
-#rm(ind_nerv, ind_neuro)
-rm(ind_nerv)
+igos <- rownames(gopcs) %in% nervdev_gos # neuro_gos
+gopcs[igos,"Neuro"] <- .Machine$double.eps # el menor pvalue posible distinto de 0
+rm(i,gonms,pcnms,X,igos)
 
 heatmap.2(gopcs,trace="none") # todo
 heatmap.2(sqrt(gopcs), trace="none") #reescalada
 heatmap(sqrt(gopcs[gopcs[,"Neuro"]==.001,])) # solo las neuro, reescaladas
 
 if(FALSE){
-  gopcs01 <- gopcs
-  gopcs01[gopcs01==0]<-1 #hacer una matriz binaria
-  gopcs01 <- ifelse(gopcs01<.05,0,1)
-  i_gos <- which(apply(gopcs01,1,sum)<ncol(gopcs01)) # GOs que aparecen
+  gopcs01 <- ifelse(gopcs<.05,0,1) #hacer una matriz binaria
+  i_gos <- which(apply(gopcs01,1,sum)<ncol(gopcs01)) # GOs que aparecen con este filtro
   
   heatmap.2(gopcs01[i_gos,],trace="none")
   
@@ -134,7 +121,61 @@ genes_enbps <- lapply(hyperg_df[,"GOBPID"],function(x){genesinbp(selected_genes_
 names(genes_enbps) <- hyperg_df[,"GOBPID"]
 # comparar distribucion de genes importantes en BP vs dist de todos los genes que no estan en BP
 
-#------------------------------------------------------------------------
+# DISTANCIA ENTRE PCS----------------------------------------------------
+coseno <- cos_sim(-log(gopcs)) #le resto la media?
+distcos <- 1-coseno #deberia calcular otra distancia?
+loc <- cmdscale(distcos)
+x <- loc[, 1]
+y <- loc[, 2]
+nombres <- colnames(gopcs)
+for (i in 1:(length(nombres)-1)){
+  nombres[i] <- paste0("PC",nombres[i])
+}
+nombres[length(nombres)] <- "nerv.syst. development"
+
+summaries <- NULL
+for (i in 1:length(nombres)){
+  igo <- which(gopcs[,i]<1)
+  
+  indices_nerv <- names(igo) %in% nervdev_gos
+  terms_si <- as.character(Term(names(igo[indices_nerv])))
+  terms_si <- paste(terms_si, collapse="</br>")
+  terms_si <- paste0("</br>",terms_si)
+  
+  terms_no <- as.character(Term(names(igo[!indices_nerv])))
+  if (length(terms_no)>10){
+    terms_no <- paste(terms_no[1:10], collapse="</br>")
+  }else{
+    terms_no <- paste(terms_no, collapse="</br>")
+  }
+  terms_no <- paste0("</br><i>",terms_no, "</i>")
+  
+  go_terms_order <- paste(terms_si, terms_no)
+  
+  summaries <- c(summaries, go_terms_order)
+}
+rm(i, igo, go_terms_order, terms_no, terms_si)
+
+# solo el grafico de distancias
+plot(x, y, type = "n", xlab = "", ylab = "", asp = 1, axes = FALSE)
+text(x, y, nombres, cex = 0.6)
+
+plot(c(x[1:10],x[length(x)]), c(y[1:10], y[length(y)]), type = "n", xlab = "", ylab = "", asp = 1, axes = FALSE)
+text(c(x[1:10],x[length(x)]), c(y[1:10], y[length(y)]), c(nombres[1:10],nombres[length(nombres)]), cex = 0.6)
+
+# el grafico con las descripciones de cada PC
+library(plotly)
+ax <- list(title = "", zeroline = F, showline = F, showticklabels = F, showgrid = F)
+plot_ly (x=x,y=y, type='scatter', mode='text',
+         text=nombres, hovertext=summaries, hoverinfo='text', showlegend=F, 
+         hoverlabel=list(namelength=-1, font=list(size=9)))%>%
+  layout(xaxis = ax, yaxis = ax)
+
+
+h <- hclust(as.dist(distcos),method = "ward.D")
+plot(h)
+
+
 # SEMANTIC SIMILARITY----------------------------------------------------
 library(GOSemSim)
 library(igraph)
@@ -153,7 +194,7 @@ evidencia <- c("EXP", "IDA", "IPI", "IMP", "IGI", "IEP", "HTP", "HDA", "HMP", "H
 ind_ev <- mmGO@geneAnno$EVIDENCE %in% evidencia
 go_exp <- mmGO@geneAnno[ind_ev,"GO"]
 
-go_list <- intersect(rownames(gopcs01), go_exp)
+go_list <- intersect(rownames(gopcs), go_exp)
 
 sim <- mgoSim(go_list,go_list,semData = mmGO, measure ="Resnik",combine=NULL)
 sim2 <- mgoSim(go_list,go_list,semData = mmGO, measure ="Wang",combine=NULL)
@@ -173,7 +214,7 @@ coord <- layout_with_fr(G)
 l <- norm_coords(coord, ymin=-1, ymax=1, xmin=-1, xmax=1)
 max_weight <- max(E(G)$weight)
 
-lista_nerv <- V(G)$name[V(G)$name %in% nervdev_offs]
+lista_nerv <- V(G)$name[V(G)$name %in% nervdev_gos]
 colores2 <- c("blue","lightblue")
 
 #si pertenece a neuro tipo=1, sino tipo=2
@@ -181,7 +222,7 @@ V(G)$type <- 2
 V(G)$type[V(G)$name %in% lista_nerv] <- 1
 
 png("fig/grafo_resnik_completo.png")
-plot.igraph(G, layout=l, rescale=FALSE, vertex.size=10, vertex.color=adjustcolor(colores2[V(G)$type], alpha.f=.5),
+plot.igraph(G, layout=l, rescale=FALSE, vertex.size=5, vertex.color=adjustcolor(colores2[V(G)$type], alpha.f=.5),
             vertex.label=NA,edge.width=E(G)$weight/max_weight,
             main="Categorias GO (BP)")
 legend('topright', legend=c('Neuro','No neuro'), pch=21, col="black", pt.bg=colores2)
@@ -190,7 +231,7 @@ dev.off()
 
 colores3 <- c("blue","gray","lightblue")
 
-for (i in 1:(length(colnames(gopcs))-1)){ #para cada pc
+for (i in 1:10){ #para cada uno de los 10 primeros pcs
   lista_pc <- V(G)$name[V(G)$name %in% rownames(gopcs01)[gopcs01[,i]==0]]
   
   subG <- subgraph(G,unique(c(lista_pc,lista_nerv))) #subgrafo con ambos (pc y nerv)
@@ -208,63 +249,13 @@ for (i in 1:(length(colnames(gopcs))-1)){ #para cada pc
     print("Paso algo con los indices")
   }
   
-  fn <- paste0("fig/grafo_resnik_pc",i)
-  #png(fn)
+  fn <- paste0("fig/grafo_resnik_pc",i,".png")
+  png(fn)
   plot.igraph(subG, layout=l[ind_coord,], rescale=FALSE, vertex.size=10,
               vertex.color=adjustcolor(colores3[V(subG)$type], alpha.f=.5), vertex.label=NA,
               edge.width=E(subG)$weight/maximo,
               main=paste("PC #",colnames(gopcs)[i]))
   legend('topright', legend=c('Neuro','PC','Ambos'), pch=21, col="black", pt.bg=colores3)
-  #dev.off()
+  dev.off()
 }
 rm(i, lista_pc, subG, maximo, indices_nerv,indices_pc,ind_coord,fn)
-
-#------------------------------------------------------------------------
-# DISTANCIA ENTRE PCS----------------------------------------------------
-# NOTA: si lo hago con las categorias que quedan enriquecidas, me quedan PCS con todas y con ninguna, pero nada intermedio
-coseno <- cos_sim(gopcs) #le resto la media?
-
-distcos <- 1-coseno #deberia calcular otra distancia?
-loc <- cmdscale(distcos)
-x <- loc[, 1]
-y <- loc[, 2]
-nombres <- colnames(gopcs)
-for (i in 1:(length(nombres)-1)){
-  nombres[i] <- paste0("PC",nombres[i])
-}
-summaries <- NULL
-for (i in 1:length(nombres)){
-  igo <- which(gopcs01[,i]==0)
-  
-  indices_nerv <- names(igo) %in% nervdev_offs
-  terms_si <- as.character(Term(names(igo[indices_nerv])))
-  terms_si <- paste(terms_si, collapse="</br>")
-  terms_si <- paste0("</br>",terms_si)
-  
-  terms_no <- as.character(Term(names(igo[!indices_nerv])))
-  if (length(terms_no)>10){
-    terms_no <- paste(terms_no[1:10], collapse="</br>")
-  }else{
-    terms_no <- paste(terms_no, collapse="</br>")
-  }
-  terms_no <- paste0("</br><i>",terms_no, "</i>")
-  
-  go_terms_order <- paste(terms_si, terms_no)
-  
-  summaries <- c(summaries, go_terms_order)
-}
-rm(i, igo, go_terms_order)
-
-plot(x, y, type = "n", xlab = "", ylab = "", asp = 1, axes = FALSE)
-text(x, y, nombres, cex = 0.6)
-
-nombres[101] <- "nerv.syst. development"
-library(plotly)
-ax <- list(title = "", zeroline = F, showline = F, showticklabels = F, showgrid = F)
-plot_ly (x=x,y=y, type='scatter', mode='text',
-         text=nombres, color=c(rep('#000000',100),'#00FF00'), hovertext=summaries, hoverinfo='text', showlegend=F, 
-         hoverlabel=list(namelength=-1, font=list(size=9)))%>%
-  layout(xaxis = ax, yaxis = ax)
-
-h <- hclust(as.dist(distcos),method = "ward.D")
-plot(h)
