@@ -104,9 +104,9 @@ make.knn <- function(expr, k){
   return(knn)
 }
 
-grafo.simplificado <- function(g, memb, plt = c('none', 'lcc', 'all')){
+grafo.coms <- function(g, memb, plt = c('none', 'lcc', 'all')){
   # Funcion que toma un grafo y una particion, y genera un nuevo grafo
-  # mas chico donde cada nodo es una comunidad, con enlaces pesados no dirigidos
+  # donde cada nodo es una comunidad, con enlaces pesados no dirigidos
   plt <- match.arg(plt)
   
   if (vcount(g)!=length(memb)){
@@ -114,7 +114,7 @@ grafo.simplificado <- function(g, memb, plt = c('none', 'lcc', 'all')){
     stopifnot(length(interseccion)>0)
     g <- induced_subgraph(g, interseccion)
     memb <- memb[interseccion]
-    print('Se utilizo el subconjunto interseccion')
+    print('Se utilizo el subconjunto interseccion entre los nodos del grafo y los elementos de la particion')
   }
   
   enlaces <- as_edgelist(g)

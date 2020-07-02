@@ -92,18 +92,18 @@ orderedgenes <- genes_by_weight(pca,ncomp=1:100,retw = TRUE)
 
 # proyeccion maxima del primer gen importante en algun PC
 g <- names(orderedgenes)[1]
-m <- max(abs(pca$rotation[match(g,rownames(Xlog)),]))
-pci <- colnames(pca$rotation)[which.max(abs(pca$rotation[match(g,rownames(Xlog)),]))]
+m <- max(abs(pca$rotation[g,]))
+pci <- colnames(pca$rotation)[which.max(abs(pca$rotation[g,]))]
 cat('El gen mas importante', g, 'de peso', as.numeric(orderedgenes[1]), 'tiene una proyeccion maxima de', m, 'en el', pci)
 
 # proyeccion maxima del primer PC o de cualquier PC en algun gen
-m <- max(pca$rotation[,1])
+m <- max(abs(pca$rotation[,1]))
 pci <- colnames(pca$rotation)[1]
-g <- rownames(pca$rotation)[which.max(pca$rotation[,1])]
+g <- rownames(pca$rotation)[which.max(abs(pca$rotation[,1]))]
 cat(pci, 'tiene una proyeccion maxima de', m, 'del gen', g)
-m <- max(apply(pca$rotation,2,max))
-pci <- colnames(pca$rotation)[which.max(apply(pca$rotation,2,max))]
-g <- rownames(pca$rotation)[which.max(apply(pca$rotation,1,max))]
+m <- max(abs(pca$rotation))
+pci <- colnames(pca$rotation)[which.max(apply(abs(pca$rotation),2,max))]
+g <- rownames(pca$rotation)[which.max(apply(abs(pca$rotation),1,max))]
 cat('La maxima proyeccion de', m, 'es del gen', g, 'sobre el', pci)
 
 dropouts <- apply(X1,1,function(x){sum(x==0)/length(x)})

@@ -10,13 +10,12 @@ load("resultados/pca_2filtros.RData")
 rm(dataA, pca_5000)
 pca <- pca_lin
 cells_pc <- t(pca$x[,1:100]) # celulas (filas de x) en 100 primeros pcs, transpuesto
-knn <- make.knn(cells_pc, k = 40)
+knn <- make.knn(cells_pc, k = 40) #tambien puedo usar matriz de NES
 
 jaccmat <- similarity(knn, method = "jaccard")
 rownames(jaccmat) <- vertex_attr(knn, name = "name")
 colnames(jaccmat) <- vertex_attr(knn, name = "name")
 jaccgr <-  graph_from_adjacency_matrix(jaccmat, mode="undirected", weighted = TRUE, diag = FALSE)
-
 
 # MCL
 df <- jaccgr

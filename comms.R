@@ -1,7 +1,7 @@
 #Analisis de comunidades: similitud, participacion de los nodos, coreness de enlaces, bordes de clusters
 
 #grafo simplificado de comunidades como nodos
-gMCL <- grafosimple(knn, membMCL, plt='lcc')
+gMCL <- grafo.coms(knn, membMCL, plt='lcc')
 
 
 #COMPARAR SIMILITUD ENTRE COMUNIDADES "LEJANAS" por ej: 1-3 1-6 2-6 3-4

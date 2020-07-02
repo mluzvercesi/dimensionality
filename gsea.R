@@ -31,14 +31,12 @@ cv2 <- cv^2
 plot(mean_gen,cv2,log="xy",xlab=expression(mu),ylab=expression(CV^2),
      sub=paste0('(',nGen,' genes, ',dim(X0)[2],' celulas)'))
 
-x <- mean_gen
-y <- cv2
-fit <- nls(log(y) ~ a*log(x)+b, start = c(a = -1, b = 10))
+fit <- nls(log(cv2) ~ a*log(mean_gen)+b, start = c(a = -1, b = 10))
 pred <- predict(fit, data.frame(x=mean_gen))
 filtro_gen <- (cv2>exp(pred)) # solo los genes por encima de este ajuste lineal
 
 X1 <- X0[filtro_gen,]
-rm(cv,cv2,filtro_gen,fit,mean_gen,pred,sdev_gen,x,y,n0)
+rm(cv,cv2,filtro_gen,fit,mean_gen,pred,sdev_gen,n0,igen)
 
 # Normalizar a 10000 cuentas por celula en A (5000 en C?)
 X1 <- apply(X1,2,function(x){x*10000/sum(x)})
