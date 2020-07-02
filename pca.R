@@ -1,89 +1,92 @@
+# Para leer los archivos por primera vez
 dataset <- 1 # (1,2,3) son (A,B,C)
-
-# Para leer los archivos
 datasets <- list("GSE95315/GSE95315_10X_expression_data.tab.gz",
                  "GSE95752/GSE95752_C1_expression_data.tab.gz",
                  "GSE104323/GSE104323_10X_expression_data_V2.tab.gz") # en orden, A B y C
 file <- paste0("Neurogenesis/Linnarson_NatNeuro2018/",datasets[dataset])
 X <- as.matrix(read.table(file, header=TRUE, row.names = 1,as.is=TRUE))
 
-# Para cargarlos
-datasets <- list("A","B","C")
-load(paste0("dataset",datasets[dataset],".RData"))
-load(paste0("results/",datasets[dataset],"subconjunto.RData"))
+# O para cargarlos
+load("resultados/datasetA.RData")
+
 X <- dataAsub
 
+# genes que aparezcan al menos 20 veces en todas las celulas
+igen <- (apply(X,1,sum)>20)
+X <- X[igen,]
+# genes que aparezcan en menos del 60% de las celulas
+igen <- (apply(X,1, function(x){sum(x=!0)})/dim(X)[2])<0.6
+X <- X[igen,]
 
-N_gen  <- dim(X)[1]
-M_cell <- dim(X)[2]
+#----
+counts <- apply(X, 2, sum) #counts por sample o celula
+features <- apply(X, 2, function(x){sum(x!=0)}) # genes por celula
+#----
+nGen  <- dim(X)[1]
+minGen <- 600 # es la cantidad minima de genes que deben expresarse
+max0cell <- 1-minGen/nGen
 
 # Eliminar celulas con poca expresion
-n0 <- as.matrix(apply(X,2,function(x){sum(x==0)}))/N_gen # porcentaje de ceros por columna
+n0 <- as.matrix(apply(X,2,function(x){sum(x==0)}))/nGen # porcentaje de ceros por celula
 
-# Para elegir porcentaje maximo de 0s por celula aceptado:
-hist(n0,main=paste('Dataset',dataset),xlab='Fraccion de ceros por celula',sub=paste0('(',N_gen,' genes, ',M_cell,' celulas)'))
-max0s <- c(0.95,0.9,0.95)
-#max0s <- c(0.92,0.88,0.95) # para los subconjuntos
-max0cell <- max0s[dataset]
+# Para ver porcentaje maximo de 0s por celula aceptado:
+hist(n0,xlab='Fraccion de ceros por celula',sub=paste0('(',nGen,' genes, ',dim(X)[2],' celulas)'))
 abline(v=max0cell,lwd=2, lty=2,col='red')
-N_gen*(1-max0cell) # es la cantidad minima de genes que deben expresarse
 
 X0 <- X[,(n0<max0cell)] # Quedan solo las que no superen el umbral
 
 
-# Normalizar a 10000 cuentas por celula en A (5000 en C?)
-X0 <- apply(X0,2,function(x){x*10000/sum(x)})
-
-
 # Eliminar genes con poca variacion
-mean_gen <- apply(X0,1,function(x){mean(x)})
-sdev_gen <- apply(X0,1,function(x){norm_vect(x-mean(x))})
+mean_gen <- apply(X0,1,mean)
+sdev_gen <- apply(X0,1,sd)
 cv <- sdev_gen/mean_gen
 cv[sdev_gen==0] <- 0 # corrijo los ceros que dieron nan
 cv2 <- cv^2
 
+plot(mean_gen,cv2,log="xy",xlab=expression(mu),ylab=expression(CV^2),
+     sub=paste0('(',nGen,' genes, ',dim(X0)[2],' celulas)'))
+
+# ajuste lineal 
+fit <- nls(log(cv2) ~ a*log(mean_gen)+b, start = c(a = -1, b = 10))
+
 # Valor medio de cv2 con bineado logaritmico
 cv2mean <- mean_logbin(cv2,mean_gen)
-
-plot(mean_gen,cv2,log="xy",
-     xlab=expression(mu),ylab=expression(CV^2),
-     main=paste('Dataset',dataset),sub=paste0('(',N_gen,' genes, ',dim(X0)[2],' celulas)'))
 points(cv2mean,col='green')
-
-# ajuste lineal con algunos bins
-# datasets: A 1:65, Asub 10:75, B 5:65, C 5:70, Csub 10:70
-x <- cv2mean$x[1:65]
-y <- cv2mean$y[1:65]
-
-fit <- nls(log(y) ~ a*log(x)+b, start = c(a = -1, b = 10))
 cv2pred <- predict(fit, data.frame(x=cv2mean$x))
-
 lines(cv2mean$x, exp(cv2pred), col="green")
 legend('topright', legend=c('data',expression(paste(mu,'(bin)')),'ajuste'),
        col=c('black','green','green'),lty=c(NA,NA,1),pch=c(1,1,NA))
 
-
-# Me quedo con los genes que esten por encima de este ajuste lineal
+# Me quedo con los genes que esten por encima del ajuste lineal
 pred <- predict(fit, data.frame(x=mean_gen))
 filtro_gen <- (cv2>exp(pred))
 X1 <- X0[filtro_gen,]
+# # en Hochgerner: 5000 genes con mas distancia al ajuste
+# o <- order(cv2-exp(pred), decreasing = TRUE)
+# X5000 <- X0[o[1:5000],]
+
+# Normalizar a 10000 cuentas por celula en dataset A
+X1 <- apply(X1,2,function(x){x*10000/sum(x)})
+X1 <- round(X1)
 
 Xlog <- X1
 Xlog[X1 != 0] <- log2(X1[X1 != 0])
 
-# PCA -------------------------------------------------------------------
+# PCA -----
 #results_iter <- pca_iter(t(X1))
 #results_svd <- pca_svd(t(Xlog))
 
 #puede ser con variables logaritmicas o escalado con std dev
 pca <- prcomp(t(Xlog),retx = TRUE)
-#pca <- prcomp(t(X1),retx = TRUE, scale=TRUE)
+#pca <- prcomp(t(X1),retx = TRUE, scale=TRUE) #para probar escalado
 
 lambdas <- (pca$sdev)^2
 w <- lambdas/sum(lambdas)
-plot(w[1:100],main=paste('Dataset',dataset),xlab="# PC",ylab="% desvio estandar")
+plot(w[1:100],xlab="# PC",ylab="% desvio estandar")
+plot(cumsum(w[1:100]),xlab="# PC",ylab="% desvio estandar acumulado")
 
 
+#analisis muy basico de genes en PCs----
 # los genes ordenados segun sus proyecciones en los 10 primeros componentes principales
 orderedgenes <- genes_by_weight(pca,ncomp=1:100,retw = TRUE)
 
@@ -107,11 +110,10 @@ dropouts <- apply(X1,1,function(x){sum(x==0)/length(x)})
 dropouts <- dropouts[order(dropouts,decreasing=FALSE)]
 
 # para ver si los dropouts tienen algo que ver (son inversos?) con la importancia
-plot(dropouts[names(orderedgenes)], xlab='indice de gen en orden de importancia total', ylab='dropout')
+plot(dropouts[names(orderedgenes)], xlab='indice de gen (en orden de peso total)', ylab='dropout')
 plot(dropouts[names(orderedgenes)], orderedgenes, ylab='peso del gen en PCs', xlab='dropout')
-plot(orderedgenes, dropouts[names(orderedgenes)], xlab='peso del gen en PCs', ylab='dropout')
 
-#------------------------------------------------------------------------
+#---
 # comparacion filtros de varianza de genes----
 
 # Ajuste de cv^2: overdispersion

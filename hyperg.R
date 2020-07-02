@@ -1,6 +1,3 @@
-load("results/Apca.RData")
-load("results/Asubconjunto.RData")
-
 library(GO.db)
 library(GOstats)
 library(org.Mm.eg.db)
@@ -8,7 +5,7 @@ library(org.Mm.eg.db)
 # para ver que tiene el paquete de Mm
 ls("package:org.Mm.eg.db")
 columns(org.Mm.eg.db)
-get("17708", org.Mm.egGENENAME) # para un solo gen, por ejemplo
+get("17708", org.Mm.egGENENAME) # por ejemplo, nombre de un gen
 
 #----
 #podria ser util para corregir algunos errores en los nombres:
@@ -17,10 +14,13 @@ table(a[,2])
 a<-as.list(org.Mm.egALIAS2EG)
 as.numeric(names(table(grep("Rik",names(a)))))
 
-# TEST HIPERGEOMETRICO PARA SOBRERREPRESENTACION-------------------------
+# TEST HIPERGEOMETRICO PARA SOBRERREPRESENTACION----
 # hgs es una matriz con resultados del test: pvalue para cada PC
+load("resultados/datasetA.RData")
+load("resultados/pca_2filtros.RData")
+rm(dataA,pca_5000)
 
-pca <- pcaAsub
+pca <- pca_lin
 
 gene_universe <- rownames(pca$rotation)
 gene_universe_id <- sym2eg(gene_universe)
@@ -28,14 +28,27 @@ if (sum(is.na(gene_universe_id))/length(gene_universe_id) > 0.1){
   cat(sprintf("Fraccion del universo de genes sin mapear: %.2f", sum(is.na(selected_genes_id))/length(selected_genes_id)))
 }
 
-hgCutoff <- 1 #usar cutoff 1 para que devuelva todos los pvalues
+hgCutoff <- 1 #usar cutoff 1 para que devuelva todos los pvalues, filtro despues
 
 nmaxpcs <- 100 #cantidad de pcs que considera
 ngenes <- 500 #genes por pc
 hgs <- rep(NULL,8)
 
+if(FALSE){
+  #como elegir cantidad de genes? veo donde dejan de aportar peso
+  orderedgenes <- genes_by_weight(pca,ncomp=1, retw = T)
+  selected_genes <- orderedgenes[1:1000]
+  plot(selected_genes, col=rainbow(nmaxpcs)[1])
+  for (i in 2:nmaxpcs){
+    orderedgenes <- genes_by_weight(pca,ncomp=i, retw=T)
+    selected_genes <- orderedgenes[1:1000]
+    points(selected_genes, col=rainbow(nmaxpcs)[i])
+  }
+}
+
 start_time <- Sys.time()
 for (i in 1:nmaxpcs){
+  cat("\r", sprintf("%.1f", 100*i/nmaxpcs),"%")
   orderedgenes <- genes_by_weight(pca,ncomp=i)
   selected_genes <- orderedgenes[1:ngenes]
   selected_genes_id <- sym2eg(selected_genes)
@@ -47,16 +60,15 @@ for (i in 1:nmaxpcs){
                 ontology="BP", pvalueCutoff=hgCutoff, conditional=FALSE, testDirection="over")
   hyperg_results <- hyperGTest(params)
   hyperg_df <- summary(hyperg_results)
-  # devuelve GOBPID (ids GO de c/categoria), pvalue, oddsratio, expcount, 
+  # devuelve GOBPID, pvalue, oddsratio, expcount, 
   # count (cantidad de selected genes en c/cat), size, term
   
-  # corrijo los pvalues
-  hyperg_df[,'Pvalue'] <- p.adjust(hyperg_df[,'Pvalue'],method='fdr')
+  hyperg_df[,'Pvalue'] <- p.adjust(hyperg_df[,'Pvalue'],method='fdr') # corrijo los pvalues
   
   index <- hyperg_df[,"Pvalue"]<0.15
   # cambiar este pvalue si quiero abarcar mas o menos, para no tener que armar la matriz cada vez
   
-  # agrego el PC solo si hay pvalue menor
+  # agrego el PC solo si hay algun pvalue menor
   if (sum(index)>0){
     hg <- hyperg_df[index,]
     hg <- hg[hg[,'Size']<200,]
@@ -69,18 +81,16 @@ for (i in 1:nmaxpcs){
     }#end if size
   }#end if pvalue
 }#end loop i (pcs)
-#colnames(hgs)[8] <- "PC"
 end_time <- Sys.time()
 print(end_time-start_time)
 rm(i, hg, hyperg_df, index, hyperg_results, params, selected_genes_id, selected_genes, orderedgenes,end_time, start_time)
 
-# REPRESENTACION VISUAL--------------------------------------------------
+# REPRESENTACION VISUAL----
 require(gplots)
-load("results/hgsAsub500genes.RData") #hgs, gopcs
-load("results/hgsAsub200genes.RData")
+load("resultados/hgs.RData")
 
-nervdev_gos <- get("GO:0007399",GOBPOFFSPRING) # nervous system development (incluye neurogen)
-#neuro_gos <- get("GO:0022008",GOBPOFFSPRING) # neurogenesis
+nervdev_gos <- get("GO:0007399",GOBPOFFSPRING) # nervous system development (incluye neurogenesis)
+neurogen_gos <- get("GO:0022008",GOBPOFFSPRING) # neurogenesis
 
 gonms <- unique(hgs[,"GOBPID"]) #categorias GO
 pcnms <- unique(hgs[,"PC"])
@@ -98,9 +108,8 @@ igos <- rownames(gopcs) %in% nervdev_gos # neuro_gos
 gopcs[igos,"Neuro"] <- .Machine$double.eps # el menor pvalue posible distinto de 0
 rm(i,gonms,pcnms,X,igos)
 
-heatmap.2(gopcs,trace="none") # todo
-heatmap.2(sqrt(gopcs), trace="none") #reescalada
-heatmap(sqrt(gopcs[gopcs[,"Neuro"]==.001,])) # solo las neuro, reescaladas
+heatmap.2(-log(gopcs), trace="none")
+heatmap(-log(gopcs[gopcs[,"Neuro"]!=1,1:100])) # solo las neuro
 
 if(FALSE){
   gopcs01 <- ifelse(gopcs<.05,0,1) #hacer una matriz binaria
@@ -115,13 +124,7 @@ if(FALSE){
   }
 }
 
-#------------------------------------------------------------------------
-# que genes aparecen en cada BP
-genes_enbps <- lapply(hyperg_df[,"GOBPID"],function(x){genesinbp(selected_genes_id,x)})
-names(genes_enbps) <- hyperg_df[,"GOBPID"]
-# comparar distribucion de genes importantes en BP vs dist de todos los genes que no estan en BP
-
-# DISTANCIA ENTRE PCS----------------------------------------------------
+# DISTANCIA ENTRE PCS----
 coseno <- cos_sim(-log(gopcs)) #le resto la media?
 distcos <- 1-coseno #deberia calcular otra distancia?
 loc <- cmdscale(distcos)
@@ -176,7 +179,7 @@ h <- hclust(as.dist(distcos),method = "ward.D")
 plot(h)
 
 
-# SEMANTIC SIMILARITY----------------------------------------------------
+# SEMANTIC SIMILARITY----
 library(GOSemSim)
 library(igraph)
 
