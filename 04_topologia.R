@@ -129,13 +129,13 @@ hist(ra.corr[1:N], main = "Distribucion de asortatividad \n en una red al azar",
 abline(v=ra.corr[N+1],col="green")
 
 
-#distribución de similitud en enlaces vs no-enlaces
+#distribuciÃ³n de similitud en enlaces vs no-enlaces
 ady <- as_adjacency_matrix(knn, sparse = FALSE)
 enlacesvect <- ady[upper.tri(ady)]
 enlacesvect <- ifelse(enlacesvect, TRUE, FALSE)
 similvect <- similitud[upper.tri(similitud)]
 hist(similvect[enlacesvect], freq=F, col=rgb(0,0.6,0.4,0.5), xlim=c(-1,1), 
-     main="Distribución de similitud de NES>0", xlab="similitud")
+     main="DistribuciÃ³n de similitud de NES>0", xlab="similitud")
 hist(similvect[!enlacesvect], freq=F, add=T, col=rgb(0,0,0.5,0.5)) # el total es casi igual a este
 legend("topleft", legend=c("enlazados","no enlazados"), fill=c(rgb(0,0.6,0.4,0.5), rgb(0,0,0.5,0.5)))
 
