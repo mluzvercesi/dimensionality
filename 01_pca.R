@@ -106,6 +106,22 @@ pci <- colnames(pca$rotation)[which.max(apply(abs(pca$rotation),2,max))]
 g <- rownames(pca$rotation)[which.max(apply(abs(pca$rotation),1,max))]
 cat('La maxima proyeccion de', m, 'es del gen', g, 'sobre el', pci)
 
+par(mfrow=c(2,2)) 
+for (i in c(1,10,50,100)){ #los pesos relativos tienen comportamiento similar en todas las PCs
+    orderedgenes <- genes_by_weight(pca,ncomp=i,retw = T)
+    plot(orderedgenes, xlab="# gen", ylab="Peso", main=paste("PC",i), ylim=c(0,.005))
+    text(100, 0.004, round(sum(orderedgenes[1:100]),digits=2),col="red")
+    text(500, 0.003, round(sum(orderedgenes[1:500]),digits=2),col="red")
+    text(1000, 0.002, round(sum(orderedgenes[1:1000]),digits=2),col="red")
+}
+
+par(mfrow=c(1,1))
+orderedgenes1 <- genes_by_weight(pca,ncomp=1, retw = T)
+plot(orderedgenes1, xlab="# gen", ylab="Peso normalizado", main=paste("PC 1 vs 100"))
+orderedgenes100 <- genes_by_weight(pca,ncomp=100, retw = T)
+points(orderedgenes100, col="blue")
+
+
 dropouts <- apply(X1,1,function(x){sum(x==0)/length(x)})
 dropouts <- dropouts[order(dropouts,decreasing=FALSE)]
 
