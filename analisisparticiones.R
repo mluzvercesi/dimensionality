@@ -103,7 +103,32 @@ bps_top20 <- apply(nes_commean, 2, function(x){rownames(nes_commean)[order(x, de
 gcoms <- grafo.coms(knn, membnes)
 plot(simplify(gcoms, remove.loops=TRUE),
      vertex.size = sqrt(V(gcoms)$size),
-     vertex.color = rgb(0,.5,.5, alpha = V(gcoms)$alpha), edge.arrow.size = .25)
+     vertex.color = rgb(0,.5,.5, alpha = V(gcoms)$alpha), edge.arrow.size = .25, layout=layout_with_fr)
 table(droplevels(particiones[names(membnes),"cell_type"]), membnes)
 
 Term(bps_top20[,1]) #para ver la descripcion de los terminos por comunidad
+
+#Posibilidad: wordcloud. centrar cada conjunto de coordenadas en el grafo de comunidades
+library(wordcloud)
+bps_top20_freq <- bps_top20
+for (i in 1:ncol(nes_commean)){bps_top20_freq[,i] <- nes_commean[bps_top20[,i],i]}
+bps_top20_freq <- matrix(as.numeric(bps_top20_freq), ncol=ncol(bps_top20_freq), nrow=nrow(bps_top20_freq))
+wordcloud(Term(bps_top20[,1]), freq = bps_top20_freq[,1], scale=c(.6,1))
+
+comcoord <- layout_with_fr(gcoms)
+
+bpnms <- Term(as.vector(bps_top20))
+todosbps <- wordlayout(x = rep(10*comcoord[,1], each = nrow(bps_top20)),
+                       y = rep(10*comcoord[,2], each = nrow(bps_top20)), 
+                       words = bpnms)
+colores <- rainbow(ncol(bps_top20))
+
+height=1200
+png(filename="bps_comunidades.png", width = 4*height/3, height = height, res = 300, pointsize=4)
+
+plot(1, type="n", xlab="", ylab="",
+     xlim=c(floor(min(todosbps[,"x"])), ceiling(max(todosbps[,"x"]))), 
+     ylim=c(floor(min(todosbps[,"y"])), ceiling(max(todosbps[,"y"]))))
+text(x=todosbps[,"x"], y=todosbps[,"y"], labels = bpnms,
+    col=rep(colores, each=nrow(bps_top20)), lheight = 0.9, cex=0.3)
+dev.off()

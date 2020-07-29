@@ -151,6 +151,11 @@ sil <- silhouette(X[X<23], dmatrix = 1-cos_sim(Z[,names(X[X<23])]), full=TRUE)
 x11()
 plot(sil)
 
+celltype <- as.numeric(factor(droplevels(metadata[rownames(pca$x),"cell_type"])))
+dissimilarity <- 1-cos_sim(t(pca$x))
+sil <- silhouette(celltype, dmatrix = dissimilarity, full=TRUE)
+x11()
+plot(sil, col=rainbow(length(unique(celltype))))
 
 #comparacion entre particiones----
 contingencia <- table(membMCL,celltypes)
